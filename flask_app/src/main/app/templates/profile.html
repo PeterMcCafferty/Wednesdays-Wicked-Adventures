@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="title">
+  Welcome, {{ name }}!
+</h1>
+
+<div class="buttons is-centered mt-5">
+  <!-- View bookings -->
+  <a href="{{ url_for('main.view_bookings') }}" class="button is-warning is-large">
+    View My Bookings
+  </a>
+
+  <!-- New booking -->
+  <a href="{{ url_for('main.new_booking') }}" class="button is-danger is-large">
+    Make a Booking
+  </a>
+</div>
+{% endblock %}
