@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="column is-6 is-offset-3">
+    <h1 class="title has-text-centered">New Booking</h1>
+
+    <div class="box" style="font-size: 1.2rem;">
+        <form method="POST" action="/booking">
+            <!-- Park -->
+            <div class="field is-horizontal">
+                <div class="field-label is-normal">
+                    <label class="label">Park</label>
+                </div>
+                <div class="field-body">
+                    <div class="field">
+                        <div class="control" style="max-width: 50%;">
+                            <div class="select is-fullwidth">
+                                <select name="park_id">
+                                    {% for park in parks %}
+                                    <option value="{{ park.park_id }}">{{ park.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Date -->
+            <div class="field is-horizontal">
+                <div class="field-label is-normal">
+                    <label class="label">Date</label>
+                </div>
+                <div class="field-body">
+                    <div class="field">
+                        <div class="control" style="max-width: 50%;">
+                            <input class="input" type="datetime-local" name="date">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tickets -->
+            <div class="field is-horizontal">
+                <div class="field-label is-normal">
+                    <label class="label">Tickets</label>
+                </div>
+                <div class="field-body">
+                    <div class="field">
+                        <div class="control" style="max-width: 50%;">
+                            <input class="input" type="number" name="num_tickets" value="1" min="1">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Health Safety -->
+            <div class="field mt-3">
+                <label class="checkbox">
+                    <input type="checkbox" name="health_safety">
+                    I acknowledge health & safety warnings
+                </label>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="field mt-4">
+                <button class="button is-danger is-fullwidth is-medium">
+                    Confirm Booking
+                </button>
+            </div>
+
+        </form>
+    </div>
+
+    <div class="mt-4">
+        <a href="{{ url_for('main.profile') }}" class="button is-info is-normal">
+            ← Back to Profile
+        </a>
+    </div>
+</div>
+{% endblock %}

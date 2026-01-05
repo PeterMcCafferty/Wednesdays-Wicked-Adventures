@@ -9,5 +9,6 @@ Python 3.9.7
 
 # Installs
 Flask
-
-
+flask-sqlalchemy 
+PyMySQL
+flask-login
