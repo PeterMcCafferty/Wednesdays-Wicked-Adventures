@@ -10,34 +10,21 @@ import sqlite3
 
 db = SQLAlchemy()
 
-def create_app(config_name="development"):
+ ## Enforce FK in SQLite3 ##
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON;")
+        cursor.close()
+
+def create_app(config_name="development"): 
+
     app = Flask(__name__)
-    ## Login ## 
-    app.config['SECRET_KEY'] = 'secret-key'
     app.config.from_object(config[config_name])
-    config[config_name].init_app(app)
-
-    ## Enforce FK in SQLite3 ##
-    @event.listens_for(Engine, "connect")
-    def set_sqlite_pragma(dbapi_connection, connection_record):
-        if isinstance(dbapi_connection, sqlite3.Connection):
-            cursor = dbapi_connection.cursor()
-            cursor.execute("PRAGMA foreign_keys=ON;")
-            cursor.close()
-
     db.init_app(app)
-
-    # create db locally and seed data (roles and parks) 
-    if config_name == "development":
-        from app import models
-        with app.app_context():
-            db.drop_all()
-            db.create_all()
-
-            from app.seed_data.data import seed_dev_data
-            seed_dev_data()
-
-
+    config[config_name].init_app(app)
+    
     # Configure Flask-Login
     login_manager = LoginManager()
     login_manager.login_view = 'login.login'
@@ -47,7 +34,6 @@ def create_app(config_name="development"):
     from .models import User
     @login_manager.user_loader
     def load_user(user_id):
-        # return User.query.get(int(user_id))
           return db.session.get(User, int(user_id))
     
     # Register Blueprints
@@ -62,3 +48,4 @@ def create_app(config_name="development"):
         return render_template("404.html"), 404
 
     return app
+
