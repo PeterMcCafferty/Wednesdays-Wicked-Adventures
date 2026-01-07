@@ -11,8 +11,8 @@
 <p><strong>Description:</strong> {{ park.description }}</p>
 {% endif %}
 
-{% if park.capacity %}
-<p><strong>Capacity:</strong> {{ park.capacity }}</p>
+{% if park.short_description %}
+<p><strong>Short Description:</strong> {{ park.short_description }}</p>
 {% endif %}
 
 <a href="{{ url_for('main.booking') }}">
