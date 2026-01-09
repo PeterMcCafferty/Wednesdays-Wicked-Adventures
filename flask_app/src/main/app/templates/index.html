@@ -12,14 +12,15 @@
       <p class="rollercoaster-description">Book if you dare!</p>
 
       <!-- Ticket Button -->
-      {% include "components/cta-button.html" %}
+      {% if parks %}
+        {% set park = parks[0] %}
+        {% include "components/cta-button.html" %}
+      {% endif %}
     </div>
   </div>
 
   <!-- Parks Carousel Section -->
-  <section class="parks-section">
-    <h2 class="section-title">Our Adventure Parks</h2>
-    
+  <section class="parks-section">    
     {% if parks %}
       <div class="parks-carousel-container">
         <!-- Left Arrow -->
@@ -31,10 +32,7 @@
         <div class="parks-carousel">
           <div class="parks-track">
             {% for park in parks %}
-              {% with %}
-                {% set park = park %}
-                {% include "components/park-cards.html" %}
-              {% endwith %}
+              {% include "components/park-cards.html" %}
             {% endfor %}
           </div>
         </div>

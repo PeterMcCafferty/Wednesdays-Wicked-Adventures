@@ -7,22 +7,18 @@
          class="park-logo-image">
   </div>
   
+  <!-- Short info section -->
   <div class="short-info">
     <h3 class="park-name">{{ park.name }}</h3>
     <p class="park-text">{{ park.short_description if park.short_description else park.description[:80] + '...' }}</p>
-    
+   
+    <!-- Park action buttons -->
     <div class="park-buttons">
       <!-- Discover More button -->
-      <a href="{{ url_for('main.park_detail', park_id=park.park_id) if hasattr(park, 'park_id') else '#' }}" 
-         class="cta-button secondary">
-        <span class="cta-text">Discover More</span>
-      </a>
+      {% include "components/cta-button-secondary.html" %}
       
       <!-- Book Tickets button -->
-      <a href="{{ url_for('main.new_booking') }}" class="cta-button">
-        <span class="cta-text">Book Tickets</span>
-        <span class="cta-arrow">→</span>
-      </a>
+      {% include "components/cta-button.html" %}
     </div>
   </div>
 </div>
