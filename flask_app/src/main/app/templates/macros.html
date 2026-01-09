@@ -1,5 +1,4 @@
-<!-- templates/macros.html -->
-{% macro auth_card(title, subtitle='', icon='', content='', links=[]) %}
+{% macro auth_card(title, subtitle='', icon='', links=[]) %}
 <div class="auth-card-wrapper">
     <div class="auth-card card">
         <div class="auth-card-header">
@@ -17,7 +16,7 @@
         </div>
 
         <div class="auth-card-content">
-            {{ content|safe }}
+            {{ caller() }}
         </div>
 
         {% if links %}

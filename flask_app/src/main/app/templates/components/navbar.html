@@ -7,7 +7,7 @@
     <span class="brand-text">Wednesday's Wicked Adventures</span>
   </a>
 
-  <!-- Dinamic Menu -->
+  <!-- Dynamic Menu -->
   <div class="navbar-end">
     {% if current_user.is_authenticated %}
       <!-- Logged in user -->
@@ -15,13 +15,18 @@
       <a href="{{ url_for('main.profile') }}" class="account-link">Profile</a>
       <span class="separator">|</span>
       <a href="{{ url_for('login.logout') }}" class="account-link">Logout</a>
-      <img src="{{ url_for('static', filename='images/User_icon.svg') }}" alt="User Icon" class="Login_icon">
+      <img src="{{ url_for('static', filename='images/User_icon.svg') }}"
+           alt="User Icon"
+           class="Login_icon">
     {% else %}
       <!-- User NOT logged in -->
       <a href="{{ url_for('login.register') }}" class="account-link">Register</a>
       <span class="separator">|</span>
       <a href="{{ url_for('login.login') }}" class="account-link">Login</a>
-      <img src="{{ url_for('static', filename='images/Login_icon.svg') }}" alt="Login Icon" class="Login_icon">
+      <img src="{{ url_for('static', filename='images/Login_icon.svg') }}"
+           alt="Login Icon"
+           class="Login_icon">
     {% endif %}
+
   </div>
 </nav>
