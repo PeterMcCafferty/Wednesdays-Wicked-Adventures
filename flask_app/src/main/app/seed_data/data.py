@@ -17,17 +17,23 @@ def seed_dev_data():
     park1 = Park(
         name='PARK 1',
         location='Dublin',
-        description='Dublin Park 1'
+        description='Dublin Park 1',
+        short_description='Park in Dublin',
+        slug='park-1-dublin'
     )
     park2 = Park(
         name='PARK 2',
         location='London',
-        description='London Park 2'
+        description='London Park 2',
+        short_description='Park in London',
+         slug='park-2-london'
     )
     park3 = Park(
         name='PARK 3',
         location='Berlin',
-        description='Belin Park 3'
+        description='Berlin Park 3',
+        short_description='Park in Berlin',
+        slug='park-3-berlin'
     )
 
     db.session.add_all([park1, park2, park3])

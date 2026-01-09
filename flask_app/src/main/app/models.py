@@ -43,14 +43,22 @@ class Park(db.Model):
     name = db.Column(db.String(150), nullable=False)
     location = db.Column(db.String(150), nullable=False)
     description = db.Column(db.String(100), nullable=False)
+    image_path = db.Column(db.String(200), default='images/parks/default.jpg')
+    short_description = db.Column(db.String(80), nullable=False)
+    slug = db.Column(db.String(100), nullable=False, unique=True)
     bookings = db.relationship('Booking', backref='park')
+    
 
     def to_json(self):
         return {
             'park_id': self.park_id,
             'name': self.name,
             'location': self.location,
-            'description': self.description 
+            'description': self.description,
+            'image_path': self.image_path,
+            'short_description': self.short_description,
+            'slug': self.slug
+
         }
 
 class Booking(db.Model):
