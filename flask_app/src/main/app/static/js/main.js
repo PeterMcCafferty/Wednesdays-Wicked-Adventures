@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
     nextBtn.disabled = isAtEnd;
   }
   
-  // Eventos de clique
+  // Click events
   prevBtn.addEventListener('click', () => {
     if (!prevBtn.disabled) {
       carousel.scrollBy({ left: -300, behavior: 'smooth' });
@@ -30,11 +30,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   
-  // Eventos
+  // Events de scroll e resize
   carousel.addEventListener('scroll', updateButtons);
   window.addEventListener('resize', updateButtons);
   
-  // Estado inicial
+  // Inicital events
   setTimeout(updateButtons, 100);
   setTimeout(updateButtons, 500);
 
@@ -99,3 +99,19 @@ document.addEventListener('DOMContentLoaded', function() {
   // Inicialização
   updateMainImage(1);
 });
+
+
+/* ============================
+Booking Form Validation 
+=============================*/
+    // Set min date to today
+  document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date().toISOString().split('T')[0];
+    const dateInput = document.querySelector('input[type="date"]');
+     dateInput.min = today;
+    
+    // If no value is set, default to today
+    if (!dateInput.value) {
+        dateInput.value = today;
+        }
+    });

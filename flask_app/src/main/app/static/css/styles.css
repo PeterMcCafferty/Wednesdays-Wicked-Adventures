@@ -1055,438 +1055,723 @@ Park Page Styles
     height: 52px; /* Reduced height */
   }
 }
-
-
 /* =========================
    Auth Card Container
 ========================= */
+/* Container wrapper for authentication card with responsive width */
 .auth-card-wrapper {
-    width: 100%;
-    max-width: 400px;
-    margin: 0 auto;
+    width: 100%; /* Full width on mobile devices */
+    max-width: 400px; /* Maximum width on larger screens */
+    margin: 0 auto; /* Center horizontally */
 }
 
 /* =========================
    Auth Card Base
 ========================= */
+/* Base styling for authentication card component */
 .auth-card {
-    padding: 2rem;
-    background-color: var(--bg-card);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border-soft);
-    box-shadow: var(--shadow-soft);
+    padding: 2rem; /* Internal spacing */
+    background-color: var(--bg-card); /* Background using CSS variable */
+    border-radius: var(--radius-lg); /* Large rounded corners */
+    border: 1px solid var(--border-soft); /* Subtle border */
+    box-shadow: var(--shadow-soft); /* Soft shadow for elevation */
 }
 
 /* =========================
    Auth Card Header
 ========================= */
+/* Header section of authentication card */
 .auth-card-header {
-    text-align: center;
-    margin-bottom: 2rem;
+    text-align: center; /* Center align all content */
+    margin-bottom: 2rem; /* Spacing below header */
 }
 
+/* Circular icon container for brand/logo */
 .auth-card-icon {
-    width: 60px;
-    height: 60px;
-    margin: 0 auto 1rem auto;
-    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 60px; /* Fixed width */
+    height: 60px; /* Fixed height */
+    margin: 0 auto 1rem auto; /* Center horizontally with bottom margin */
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); /* Gradient background */
+    border-radius: 50%; /* Perfect circle */
+    display: flex; /* Flexbox for centering content */
+    align-items: center; /* Vertical centering */
+    justify-content: center; /* Horizontal centering */
 }
 
+/* SVG icon styling inside the circular container */
 .auth-card-icon svg {
-    width: 28px;
-    height: 28px;
-    color: white;
+    width: 28px; /* Icon width */
+    height: 28px; /* Icon height */
+    color: white; /* White icon color */
 }
 
+/* Main title styling */
 .auth-card-title {
-    color: var(--text-main);
-    font-size: 1.75rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
+    color: var(--text-main); /* Primary text color */
+    font-size: 1.75rem; /* Large font size */
+    font-weight: 600; /* Semi-bold weight */
+    margin-bottom: 0.5rem; /* Spacing below title */
 }
 
+/* Subtitle/description text styling */
 .auth-card-subtitle {
-    color: var(--text-muted);
-    font-size: 0.95rem;
-    line-height: 1.5;
+    color: var(--text-muted); /* Muted text color */
+    font-size: 0.95rem; /* Slightly smaller font */
+    line-height: 1.5; /* Improved readability */
 }
 
 /* =========================
    Auth Card Links
 ========================= */
+/* Container for authentication-related links */
 .auth-card-links {
-    margin-top: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    text-align: center;
+    margin-top: 1.5rem; /* Spacing above links */
+    display: flex; /* Flexbox layout */
+    flex-direction: column; /* Stack vertically */
+    gap: 0.75rem; /* Spacing between links */
+    text-align: center; /* Center align text */
 }
 
+/* Base link styling */
 .auth-card-link {
-    color: var(--text-muted);
-    font-size: 0.9rem;
-    text-decoration: none;
-    transition: color var(--transition-fast);
+    color: var(--text-muted); /* Muted text color */
+    font-size: 0.9rem; /* Small font size */
+    text-decoration: none; /* Remove underline */
+    transition: color var(--transition-fast); /* Smooth color transition */
 }
 
 /* Hover state for links */
 .auth-card-link:hover {
-    color: var(--accent-primary);
-    text-decoration: underline;
+    color: var(--accent-primary); /* Change to primary color on hover */
+    text-decoration: underline; /* Add underline on hover */
 }
 
 /* Primary variant for highlighted links */
 .auth-card-link.primary {
-    color: var(--accent-primary);
-    font-weight: 600;
+    color: var(--accent-primary); /* Primary accent color */
+    font-weight: 600; /* Bold font weight */
 }
 
 /* =========================
    Auth Form Styles
 ========================= */
 
-/* Form container */
+/* Form container styling */
 .auth-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
+    display: flex; /* Flexbox layout */
+    flex-direction: column; /* Stack form elements vertically */
+    gap: 1.5rem; /* Spacing between form groups */
 }
 
-/* Form field group */
+/* Form field group container */
 .auth-form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    display: flex; /* Flexbox layout */
+    flex-direction: column; /* Stack label and input vertically */
+    gap: 0.5rem; /* Spacing between label and input */
 }
 
-/* Field label */
+/* Field label styling */
 .auth-form-label {
-    color: var(--text-main);
-    font-size: 0.9rem;
-    font-weight: 500;
+    color: var(--text-main); /* Primary text color */
+    font-size: 0.9rem; /* Small font size */
+    font-weight: 500; /* Medium font weight */
 }
 
-/* Input fields */
+/* Input fields base styling */
 .auth-form-input {
-    width: 100%;
-    padding: 0.875rem 1rem;
-    background-color: var(--bg-surface);
-    border: 1px solid var(--border-soft);
-    border-radius: var(--radius-sm);
-    color: var(--text-main);
-    font-family: 'Inter', sans-serif;
-    font-size: 0.95rem;
-    transition: all var(--transition-default);
+    width: 100%; /* Full width of container */
+    padding: 0.875rem 1rem; /* Internal spacing */
+    background-color: var(--bg-surface); /* Background color */
+    border: 1px solid var(--border-soft); /* Border styling */
+    border-radius: var(--radius-sm); /* Small rounded corners */
+    color: var(--text-main); /* Text color */
+    font-family: 'Inter', sans-serif; /* Font family */
+    font-size: 0.95rem; /* Font size */
+    transition: all var(--transition-default); /* Smooth transition for all properties */
 }
 
-/* Focus state for inputs */
+/* Focus state for input fields */
 .auth-form-input:focus {
-    outline: none;
-    border-color: var(--accent-primary);
-    box-shadow: 0 0 0 3px rgba(255, 122, 217, 0.1);
+    outline: none; /* Remove default outline */
+    border-color: var(--accent-primary); /* Change border color on focus */
+    box-shadow: 0 0 0 3px rgba(255, 122, 217, 0.1); /* Subtle focus ring */
 }
 
-/* Placeholder text */
+/* Placeholder text styling */
 .auth-form-input::placeholder {
-    color: var(--text-muted);
+    color: var(--text-muted); /* Muted color for placeholder */
 }
 
 /* =========================
    Auth Checkbox
 ========================= */
+/* Checkbox container styling */
 .auth-checkbox {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: pointer;
-    color: var(--text-muted);
-    font-size: 0.9rem;
+    display: flex; /* Flexbox for alignment */
+    align-items: center; /* Vertical centering */
+    gap: 0.5rem; /* Spacing between checkbox and label */
+    cursor: pointer; /* Pointer cursor on hover */
+    color: var(--text-muted); /* Muted text color */
+    font-size: 0.9rem; /* Small font size */
 }
 
 /* Checkbox input styling */
 .auth-checkbox input {
-    accent-color: var(--accent-primary);
+    accent-color: var(--accent-primary); /* Custom checkbox color */
 }
 
 /* =========================
    Auth Submit Button
 ========================= */
+/* Submit button styling */
 .auth-submit-button {
-    width: 100%;
-    padding: 1rem;
-    margin-top: 0.5rem;
+    width: 100%; /* Full width */
+    padding: 1rem; /* Button padding */
+    margin-top: 0.5rem; /* Spacing above button */
 }
 
 /* =========================
    Password Input Wrapper
 ========================= */
+/* Wrapper for password input with toggle button */
 .auth-password-wrapper {
-    position: relative;
+    position: relative; /* For positioning toggle button absolutely */
 }
 
-/* Password toggle button */
+/* Password visibility toggle button */
 .auth-toggle-password {
-    position: absolute;
-    right: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-muted);
-    transition: color var(--transition-fast);
+    position: absolute; /* Absolute positioning within wrapper */
+    right: 1rem; /* Position from right edge */
+    top: 50%; /* Vertical centering */
+    transform: translateY(-50%); /* Precise vertical centering */
+    background: none; /* No background */
+    border: none; /* No border */
+    cursor: pointer; /* Pointer cursor */
+    padding: 0; /* No padding */
+    width: 24px; /* Fixed width */
+    height: 24px; /* Fixed height */
+    display: flex; /* Flexbox for centering icon */
+    align-items: center; /* Vertical centering */
+    justify-content: center; /* Horizontal centering */
+    color: var(--text-muted); /* Muted icon color */
+    transition: color var(--transition-fast); /* Smooth color transition */
 }
 
 /* Hover state for toggle button */
 .auth-toggle-password:hover {
-    color: var(--accent-primary);
+    color: var(--accent-primary); /* Change color on hover */
 }
 
+/* Icon styling inside toggle button */
 .auth-toggle-password svg {
-    width: 20px;
-    height: 20px;
+    width: 20px; /* Icon width */
+    height: 20px; /* Icon height */
 }
 
 /* =========================
    Auth Form Options
 ========================= */
+/* Container for form options like remember me and forgot password */
 .auth-form-options {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.9rem;
+    display: flex; /* Flexbox layout */
+    justify-content: space-between; /* Space items evenly */
+    align-items: center; /* Vertical alignment */
+    font-size: 0.9rem; /* Small font size */
 }
 
 /* =========================
    Auth Page Layouts
 ========================= */
 
-/* Base layout for auth pages */
+/* Base layout for authentication pages */
 .auth-page {
-    min-height: calc(100vh - 180px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem 1.5rem;
+    min-height: calc(100vh - 180px); /* Minimum height accounting for header/footer */
+    display: flex; /* Flexbox for centering */
+    align-items: center; /* Vertical centering */
+    justify-content: center; /* Horizontal centering */
+    padding: 2rem 1.5rem; /* Page padding */
 }
 
 /* Two-column layout container */
 .auth-layout {
-    display: flex;
-    gap: 4rem;
-    align-items: center;
-    max-width: 1100px;
-    width: 100%;
-    margin: 0 auto;
+    display: flex; /* Flexbox for columns */
+    gap: 4rem; /* Spacing between columns */
+    align-items: center; /* Vertical alignment of columns */
+    max-width: 1100px; /* Maximum width */
+    width: 100%; /* Full width */
+    margin: 0 auto; /* Center horizontally */
 }
 
-/* Info column (left side) */
+/* Info column (left side with features) */
 .auth-info-column {
-    flex: 1;
-    color: var(--text-main);
+    flex: 1; /* Take available space */
+    color: var(--text-main); /* Primary text color */
 }
 
 /* Title in info column */
 .auth-info-column h1 {
-    font-size: 2.5rem;
-    font-weight: 700;
-    line-height: 1.2;
-    margin-bottom: 1rem;
-    color: var(--brand-primary);
+    font-size: 2.5rem; /* Large font size */
+    font-weight: 700; /* Bold weight */
+    line-height: 1.2; /* Line height */
+    margin-bottom: 1rem; /* Spacing below */
+    color: var(--brand-primary); /* Brand primary color */
 }
 
-/* Description text */
+/* Description text in info column */
 .auth-info-column p {
-    font-size: 1.1rem;
-    color: var(--text-muted);
-    line-height: 1.6;
-    max-width: 400px;
+    font-size: 1.1rem; /* Medium font size */
+    color: var(--text-muted); /* Muted text color */
+    line-height: 1.6; /* Improved readability */
+    max-width: 400px; /* Limit width for better readability */
 }
 
-/* Form column (right side) */
+/* Form column (right side with form) */
 .auth-form-column {
-    flex: 0 0 400px;
+    flex: 0 0 400px; /* Fixed width of 400px */
 }
 
 /* =========================
    Auth Features List
 ========================= */
+/* Container for feature list */
 .auth-features {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    margin-top: 2rem;
+    display: flex; /* Flexbox layout */
+    flex-direction: column; /* Stack features vertically */
+    gap: 1.5rem; /* Spacing between features */
+    margin-top: 2rem; /* Spacing above features */
 }
 
 /* Individual feature item */
 .auth-feature {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
+    display: flex; /* Flexbox for icon and text */
+    gap: 1rem; /* Spacing between icon and content */
+    align-items: center; /* Vertical alignment */
 }
 
 /* Feature icon container */
 .auth-feature-icon {
-    flex-shrink: 0;
-    width: 48px;
-    height: 48px;
-    background: var(--bg-card);
-    border-radius: var(--radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--border-soft);
+    flex-shrink: 0; /* Prevent icon from shrinking */
+    width: 48px; /* Fixed width */
+    height: 48px; /* Fixed height */
+    background: var(--bg-card); /* Background color */
+    border-radius: var(--radius-md); /* Medium rounded corners */
+    display: flex; /* Flexbox for centering icon */
+    align-items: center; /* Vertical centering */
+    justify-content: center; /* Horizontal centering */
+    border: 1px solid var(--border-soft); /* Subtle border */
 }
 
+/* Icon styling inside feature icon container */
 .auth-feature-icon svg {
-    width: 24px;
-    height: 24px;
-    color: var(--accent-primary);
+    width: 24px; /* Icon width */
+    height: 24px; /* Icon height */
+    color: var(--accent-primary); /* Primary accent color */
 }
 
-/* Feature text content */
+/* Feature text content container */
 .auth-feature-content h3 {
-    color: var(--text-main);
-    font-size: 1rem;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
+    color: var(--text-main); /* Primary text color */
+    font-size: 1rem; /* Font size */
+    font-weight: 600; /* Semi-bold weight */
+    margin-bottom: 0.25rem; /* Spacing below title */
 }
 
 .auth-feature-content p {
-    color: var(--text-muted);
-    font-size: 0.9rem;
-    margin: 0;
+    color: var(--text-muted); /* Muted text color */
+    font-size: 0.9rem; /* Small font size */
+    margin: 0; /* Remove default margins */
 }
 
 /* =========================
    Auth Messages & Errors
 ========================= */
+/* Base styling for authentication messages */
 .auth-message {
-    padding: 0.75rem 1rem;
-    border-radius: var(--radius-sm);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 1.5rem;
-    font-size: 0.9rem;
+    padding: 0.75rem 1rem; /* Internal spacing */
+    border-radius: var(--radius-sm); /* Small rounded corners */
+    display: flex; /* Flexbox for icon and text */
+    align-items: center; /* Vertical alignment */
+    gap: 0.5rem; /* Spacing between icon and text */
+    margin-bottom: 1.5rem; /* Spacing below message */
+    font-size: 0.9rem; /* Small font size */
 }
 
-/* Success message */
+/* Success message variant */
 .auth-message.success {
-    background-color: rgba(155, 92, 255, 0.1);
-    border: 1px solid var(--accent-secondary);
-    color: var(--accent-secondary);
+    background-color: rgba(155, 92, 255, 0.1); /* Light purple background */
+    border: 1px solid var(--accent-secondary); /* Purple border */
+    color: var(--accent-secondary); /* Purple text */
 }
 
-/* Error message */
+/* Error message variant */
 .auth-message.error {
-    background-color: rgba(255, 94, 0, 0.1);
-    border: 1px solid var(--brand-primary);
-    color: var(--brand-primary);
+    background-color: rgba(255, 94, 0, 0.1); /* Light orange background */
+    border: 1px solid var(--brand-primary); /* Orange border */
+    color: var(--brand-primary); /* Orange text */
 }
 
+/* Icon styling in messages */
 .auth-message svg {
-    width: 20px;
-    height: 20px;
-    flex-shrink: 0;
+    width: 20px; /* Icon width */
+    height: 20px; /* Icon height */
+    flex-shrink: 0; /* Prevent icon from shrinking */
 }
 
 /* =========================
    Form Hint Text
 ========================= */
+/* Hint text for form fields */
 .auth-form-hint {
-    color: var(--text-muted);
-    font-size: 0.8rem;
-    margin-top: 0.25rem;
-    display: block;
+    color: var(--text-muted); /* Muted text color */
+    font-size: 0.8rem; /* Very small font size */
+    margin-top: 0.25rem; /* Small spacing above */
+    display: block; /* Block display */
 }
 
 /* =========================
    Responsive Design
 ========================= */
 
-/* Tablet and mobile screens */
+/* Media query for tablet and mobile screens (max-width: 768px) */
 @media (max-width: 768px) {
+    /* Switch from row to column layout on mobile */
     .auth-layout {
-        flex-direction: column;
-        gap: 2rem;
+        flex-direction: column; /* Stack columns vertically */
+        gap: 2rem; /* Reduced spacing between sections */
     }
     
+    /* Center align content in info column on mobile */
     .auth-info-column {
-        text-align: center;
+        text-align: center; /* Center align text */
     }
     
+    /* Reduce font size for mobile */
     .auth-info-column h1 {
-        font-size: 2rem;
+        font-size: 2rem; /* Smaller font size for mobile */
     }
     
+    /* Adjust paragraph styling for mobile */
     .auth-info-column p {
-        margin: 0 auto 2rem auto;
+        margin: 0 auto 2rem auto; /* Center with bottom margin */
     }
     
+    /* Center feature items on mobile */
     .auth-feature {
-        justify-content: center;
+        justify-content: center; /* Center horizontally */
     }
     
+    /* Make form column flexible on mobile */
     .auth-form-column {
-        flex: 0 0 auto;
-        width: 100%;
-        max-width: 400px;
+        flex: 0 0 auto; /* Remove fixed flex basis */
+        width: 100%; /* Full width */
+        max-width: 400px; /* Limit maximum width */
     }
     
+    /* Reduce card padding on mobile */
     .auth-card {
-        padding: 1.5rem;
+        padding: 1.5rem; /* Smaller padding on mobile */
     }
 }
 
 /* =========================
    Loading States
 ========================= */
+/* Loading spinner for authentication processes */
 .auth-loading-spinner {
-    width: 24px;
-    height: 24px;
-    animation: auth-spin 1s linear infinite;
-    display: inline-block;
-    vertical-align: middle;
-    margin-right: 0.5rem;
+    width: 24px; /* Spinner width */
+    height: 24px; /* Spinner height */
+    animation: auth-spin 1s linear infinite; /* Continuous rotation */
+    display: inline-block; /* Inline display */
+    vertical-align: middle; /* Vertical alignment */
+    margin-right: 0.5rem; /* Spacing to the right */
 }
 
+/* Keyframes for spinner rotation animation */
 @keyframes auth-spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% { transform: rotate(0deg); } /* Starting position */
+    100% { transform: rotate(360deg); } /* Full rotation */
 }
 
 /* =========================
    Input with Icon
 ========================= */
+/* Container for input field with icon */
 .auth-input-with-icon {
-    position: relative;
+    position: relative; /* For positioning icon absolutely */
 }
 
+/* Icon inside input field */
 .auth-input-icon {
-    position: absolute;
-    left: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
-    pointer-events: none;
+    position: absolute; /* Absolute positioning */
+    left: 1rem; /* Position from left edge */
+    top: 50%; /* Vertical centering */
+    transform: translateY(-50%); /* Precise vertical centering */
+    pointer-events: none; /* Allow clicks to pass through to input */
 }
 
+/* Icon styling */
 .auth-input-icon svg {
-    width: 20px;
-    height: 20px;
-    color: var(--text-muted);
+    width: 20px; /* Icon width */
+    height: 20px; /* Icon height */
+    color: var(--text-muted); /* Muted icon color */
 }
 
+/* Adjust input padding to accommodate icon */
 .auth-input-with-icon .auth-form-input {
-    padding-left: 3rem;
+    padding-left: 3rem; /* Extra padding on left for icon */
 }
+
+/* =========================
+New Booking Page Styles
+========================= */
+    /* Additional styles for booking form */
+    /* Wrapper for select elements */
+    .select-wrapper {
+        position: relative; /* For custom select styling */
+    }
+    
+    /* Custom styling for select inputs */
+    select.auth-form-input {
+        appearance: none; /* Remove default styling */
+        -webkit-appearance: none; /* Remove default styling in WebKit */
+        -moz-appearance: none; /* Remove default styling in Firefox */
+        cursor: pointer; /* Pointer cursor */
+    }
+    
+    /* Ensure date input follows dark theme */
+    input[type="date"].auth-form-input {
+        color-scheme: dark; /* Dark color scheme for date picker */
+    }
+    
+    /* Button icon alignment and animation */
+    .button svg {
+        transition: transform 0.3s ease; /* Smooth transform transition */
+    }
+    
+    /* Icon animation on button hover */
+    .button:hover svg {
+        transform: translateX(4px); /* Move icon to the right on hover */
+    }
+
+/* =========================
+   Booking Confirmation Styles
+========================= */
+    /* Component wrapper for bookings table */
+    .bookings-table-component {
+        width: 100%; /* Full width */
+    }
+    
+    /* Main table styling */
+    .bookings-table {
+        width: 100%; /* Full width */
+        border-collapse: collapse; /* Remove spacing between cells */
+        background: var(--bg-card); /* Background color */
+        border-radius: var(--radius-md); /* Rounded corners */
+        overflow: hidden; /* Clip content to rounded corners */
+    }
+    
+    /* Table header styling */
+    .bookings-table thead {
+        background: var(--bg-surface); /* Different background for header */
+    }
+    
+    /* Table header cell styling */
+    .bookings-table th {
+        color: var(--text-main); /* Primary text color */
+        font-weight: 600; /* Bold font weight */
+        padding: 1rem; /* Cell padding */
+        text-align: left; /* Left aligned text */
+        border-bottom: 2px solid var(--border-soft); /* Bottom border */
+    }
+    
+    /* Table data cell styling */
+    .bookings-table td {
+        padding: 1rem; /* Cell padding */
+        border-bottom: 1px solid var(--border-soft); /* Bottom border */
+        color: var(--text-main); /* Primary text color */
+    }
+    
+    /* Remove border from last row */
+    .bookings-table tr:last-child td {
+        border-bottom: none; /* No border on last row */
+    }
+    
+    /* Hover effect for table rows */
+    .bookings-table tr:hover {
+        background: rgba(255, 122, 217, 0.05); /* Light pink background on hover */
+    }
+    
+    /* Strong text within table */
+    .bookings-table strong {
+        color: var(--accent-primary); /* Primary accent color */
+    }
+    
+    /* Location text styling */
+    .bookings-table .location {
+        font-size: 0.85rem; /* Small font size */
+        color: var(--text-muted); /* Muted text color */
+        margin-top: 0.25rem; /* Small spacing above */
+    }
+    
+    /* Ticket count badge styling */
+    .ticket-count {
+        background: var(--accent-secondary); /* Purple background */
+        color: white; /* White text */
+        width: 24px; /* Fixed width */
+        height: 24px; /* Fixed height */
+        border-radius: 50%; /* Circular shape */
+        display: inline-flex; /* Flexbox for centering */
+        align-items: center; /* Vertical centering */
+        justify-content: center; /* Horizontal centering */
+        font-weight: 600; /* Bold font weight */
+    }
+    
+    /* Generic tag styling */
+    .tag {
+        display: inline-block; /* Inline block display */
+        padding: 0.25rem 0.75rem; /* Internal spacing */
+        border-radius: 20px; /* Pill shape */
+        font-size: 0.85rem; /* Small font size */
+        background: rgba(255, 255, 255, 0.05); /* Semi-transparent background */
+        color: var(--text-muted); /* Muted text color */
+        border: 1px solid var(--border-soft); /* Border */
+    }
+    
+    /* Success variant for tags */
+    .tag.success {
+        background: rgba(155, 92, 255, 0.15); /* Light purple background */
+        color: var(--accent-secondary); /* Purple text */
+        border-color: rgba(155, 92, 255, 0.3); /* Purple border */
+    }
+    
+    /* Empty bookings state styling */
+    .empty-bookings {
+        text-align: center; /* Center align content */
+        padding: 2rem; /* Internal spacing */
+        color: var(--text-muted); /* Muted text color */
+    }
+    
+    /* Icon styling in empty state */
+    .empty-bookings svg {
+        opacity: 0.3; /* Low opacity for subtle icon */
+        margin-bottom: 1rem; /* Spacing below icon */
+    }
+    
+/* =========================
+Profile Page Styles
+========================= */
+    /* Main profile container */
+    .profile-container {
+        max-width: 1200px; /* Maximum width */
+        margin: 0 auto; /* Center horizontally */
+        padding: 2rem 1.5rem; /* Internal spacing */
+    }
+    
+    /* Profile header section */
+    .profile-header {
+        text-align: center; /* Center align content */
+        margin-bottom: 2rem; /* Spacing below header */
+    }
+    
+    /* Main title in profile header */
+    .profile-header .title {
+        color: var(--accent-primary); /* Primary accent color */
+        font-size: 2.5rem; /* Large font size */
+        margin-bottom: 0.5rem; /* Spacing below title */
+    }
+    
+    /* Subtitle in profile header */
+    .profile-header .subtitle {
+        color: var(--text-muted); /* Muted text color */
+    }
+    
+    /* Profile action buttons container */
+    .profile-actions {
+        display: flex; /* Flexbox layout */
+        justify-content: center; /* Center buttons horizontally */
+        margin-bottom: 3rem; /* Spacing below actions */
+    }
+    
+    /* Profile action button styling */
+    .profile-actions .button {
+        padding: 0.75rem 2rem; /* Button padding */
+        font-size: 1.1rem; /* Larger font size */
+    }
+    
+    /* Icon in profile action button */
+    .profile-actions .button svg {
+        margin-right: 0.5rem; /* Spacing between icon and text */
+    }
+    
+    /* Bookings section container */
+    .bookings-section {
+        background: var(--bg-surface); /* Background color */
+        border-radius: var(--radius-lg); /* Large rounded corners */
+        padding: 2rem; /* Internal spacing */
+        margin-bottom: 2rem; /* Spacing below section */
+        border: 1px solid var(--border-soft); /* Border */
+    }
+    
+    /* Section header with title and stats */
+    .section-header {
+        display: flex; /* Flexbox layout */
+        justify-content: space-between; /* Space between title and stats */
+        align-items: center; /* Vertical alignment */
+        margin-bottom: 1.5rem; /* Spacing below header */
+    }
+    
+    /* Section title styling */
+    .section-title {
+        color: var(--text-main); /* Primary text color */
+        font-size: 1.5rem; /* Font size */
+        font-weight: 600; /* Semi-bold weight */
+    }
+    
+    /* Bookings statistics container */
+    .bookings-stats {
+        display: flex; /* Flexbox layout */
+        gap: 1.5rem; /* Spacing between stats */
+    }
+    
+    /* Individual statistic item */
+    .bookings-stats .stat {
+        color: var(--text-muted); /* Muted text color */
+        font-size: 0.9rem; /* Small font size */
+    }
+    
+    /* Highlighted number in statistic */
+    .bookings-stats .stat strong {
+        color: var(--accent-primary); /* Primary accent color */
+        font-size: 1.2rem; /* Larger font size */
+    }
+        
+    /* Media query for mobile responsiveness */
+    @media (max-width: 768px) {
+        /* Adjust profile container for mobile */
+        .profile-container {
+            padding: 1rem; /* Reduced padding on mobile */
+        }
+        
+        /* Reduce title size on mobile */
+        .profile-header .title {
+            font-size: 2rem; /* Smaller font size for mobile */
+        }
+        
+        /* Stack section header elements on mobile */
+        .section-header {
+            flex-direction: column; /* Stack vertically */
+            align-items: flex-start; /* Align to start */
+            gap: 1rem; /* Spacing between stacked items */
+        }
+        
+        /* Adjust stats layout for mobile */
+        .bookings-stats {
+            width: 100%; /* Full width */
+            justify-content: space-between; /* Distribute stats evenly */
+        }
+        
+        /* Single column layout for parks grid on mobile */
+        .parks-grid {
+            grid-template-columns: 1fr; /* Single column */
+        }
+    }

@@ -30,13 +30,13 @@ def seed_dev_data():
         short_description='Step into a world of spells. Feel the magic all around you.',
         slug='park-1-dublin',
         image_path='images/parks/witches/hat.png',
-        folder='witches',  # ADICIONADO
-        hours='10:00 AM - 8:00 PM',  # ADICIONADO
-        difficulty='Moderate',  # ADICIONADO
-        min_age=10,  # ADICIONADO
-        price='Starting at $39.99',  # ADICIONADO
-        wait_time='20-40 minutes',  # ADICIONADO
-        height_requirement='42" (1.07m)',  # ADICIONADO
+        folder='witches',
+        hours='10:00 AM - 8:00 PM',
+        difficulty='Moderate',
+        min_age=10,
+        price='Starting at $39.99',
+        wait_time='20-40 minutes',
+        height_requirement='42" (1.07m)',
     )
     park2 = Park(
         name='Spider Park',
