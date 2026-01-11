@@ -7,10 +7,15 @@
     <span class="brand-text">Wednesday's Wicked Adventures</span>
   </a>
 
+    <!-- home link -->
+  <div class="navbar-home-link">
+    <a href="{{ url_for('main.index') }}">Home</a>
+  </div>
+
   <!-- Dynamic Menu -->
   <div class="navbar-end">
     {% if current_user.is_authenticated %}
-      <!-- User Not logged -->
+      <!-- User logged in-->
       <span class="welcome-text">Welcome, {{ current_user.name }}!</span>
       <a href="{{ url_for('main.profile') }}" class="account-link">Profile</a>
       <span class="separator">|</span>
@@ -19,7 +24,7 @@
            alt="User Icon"
            class="Login_icon">
     {% else %}
-      <!-- User Logged in -->
+      <!-- User Not logged in -->
       <a href="{{ url_for('login.register') }}" class="account-link">Register</a>
       <span class="separator">|</span>
       <a href="{{ url_for('login.login') }}" class="account-link">Login</a>
