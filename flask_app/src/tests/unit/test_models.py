@@ -49,10 +49,25 @@ class TestUserModel:
     def test_user_password_not_stored_plain(self, app):
         """Test that passwords are hashed"""
         with app.app_context():
-            user = User.query.filter_by(email='test@example.com').first()
-            assert user.password != 'password123'
-            assert check_password_hash(user.password, 'password123')
-    
+            from app import db
+            from werkzeug.security import generate_password_hash, check_password_hash
+            
+            # Create a fresh user just for this test
+            test_password = 'testpass456'
+            fresh_user = User(
+                name='Fresh',
+                last_name='User',
+                email='fresh@test.com',
+                password=generate_password_hash(test_password, method='pbkdf2:sha256'),
+                role_id=2
+            )
+            db.session.add(fresh_user)
+            db.session.commit()
+            
+            # Now test it
+            assert fresh_user.password != test_password
+            assert check_password_hash(fresh_user.password, test_password)
+
     def test_user_unique_email(self, app):
         """Test that email must be unique"""
         with app.app_context():
@@ -139,12 +154,25 @@ class TestParkModel:
         with app.app_context():
             park = Park(
                 name='Test Park',
-                location='Test Location',
-                description='Test Description'
+                location='Test City',
+                description='A test park description',
+                short_description='Short test desc',
+                slug='test-park',
+                image_path='images/test.png',
+                folder='test',
+                hours='9:00 AM - 6:00 PM',
+                difficulty='Easy',
+                min_age=5,
+                price='$25.00',
+                wait_time='10-20 minutes',
+                height_requirement='36" (0.9m)'
             )
             assert park.name == 'Test Park'
-            assert park.location == 'Test Location'
-    
+            assert park.location == 'Test City'
+            assert park.slug == 'test-park'
+            assert park.difficulty == 'Easy'
+            assert park.min_age == 5
+
     def test_park_to_json(self, app):
         """Test Park.to_json() method"""
         with app.app_context():
@@ -154,7 +182,68 @@ class TestParkModel:
             assert 'name' in json_data
             assert 'location' in json_data
             assert 'description' in json_data
-    
+            assert 'image_path' in json_data
+            assert 'short_description' in json_data
+            assert 'slug' in json_data
+            assert 'folder' in json_data
+            assert 'hours' in json_data
+            assert 'difficulty' in json_data
+            assert 'min_age' in json_data
+            assert 'price' in json_data
+            assert 'wait_time' in json_data
+            assert 'height_requirement' in json_data
+            
+    def test_park_slug_unique(self, app):
+        """Test that park slug must be unique"""
+        with app.app_context():
+            from app import db
+            
+            park1 = Park(
+                name='Park A',
+                location='Location A',
+                description='Description A',
+                short_description='Short A',
+                slug='unique-slug'
+            )
+            db.session.add(park1)
+            db.session.commit()
+            
+            park2 = Park(
+                name='Park B',
+                location='Location B',
+                description='Description B',
+                short_description='Short B',
+                slug='unique-slug'  # Same slug
+            )
+            db.session.add(park2)
+            with pytest.raises(Exception):
+                db.session.commit()
+            db.session.rollback()
+
+    def test_park_default_values(self, app):
+        """Test park default values"""
+        with app.app_context():
+            from app import db
+            
+            park = Park(
+                name='Minimal Park',
+                location='Somewhere',
+                description='Basic',
+                short_description='Short',
+                slug='minimal-park'
+            )
+            db.session.add(park)
+            db.session.commit()
+            
+            assert park.image_path == 'images/parks/default.jpg'
+            assert park.folder == ''
+            assert park.hours == '9:00 AM - 10:00 PM'
+            assert park.difficulty == 'Moderate'
+            assert park.min_age == 12
+            assert park.price == 'Starting at $49.99'
+            assert park.wait_time == '30-60 minutes'
+            assert park.height_requirement == '48" (1.2m)'
+
     def test_park_booking_relationship(self, app):
         """Test Park-Booking relationship"""
         with app.app_context():
