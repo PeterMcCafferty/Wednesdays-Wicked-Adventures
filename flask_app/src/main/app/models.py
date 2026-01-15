@@ -1,5 +1,5 @@
-from wtforms import PasswordField
-from wtforms.validators import DataRequired, Email, EqualTo
+# from wtforms import PasswordField
+from wtforms.validators import DataRequired, Email #, EqualTo
 from werkzeug.security import generate_password_hash
 from flask_login import UserMixin, current_user
 from flask_admin.contrib.sqla import ModelView
@@ -191,6 +191,7 @@ class ParkView(AppModelView):
     column_list = ('name', 'location', 'description', 'image_path', 'short_description', 'slug', 'folder', 'hours','min_age', 'price','wait_time', 'height_requirement')
     column_labels = dict(name='Name', location='Location', description='Description', image_path='Image Path', short_description='Short Description', slug='Slug', folder='Folder', hours='Hours', min_age='Min Age', price='Price', wait_time='Wait Time', height_requirement='Height Requirement')
     column_filters = ('name', 'location')
+    column_formatters = dict(description=lambda v, c, m, p: m.description[:50] + '...')
     column_searchable_list = ('name', 'location')
     column_sortable_list = ()
     form_columns = ('name', 'location', 'description', 'image_path', 'short_description', 'slug', 'folder', 'hours','min_age', 'price','wait_time', 'height_requirement')
