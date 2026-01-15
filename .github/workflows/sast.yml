@@ -23,7 +23,31 @@ jobs:
       run: pip install bandit
         
     - name: Run Bandit SAST scan
-      run: bandit -r . -f json -o bandit-results.json || true
+      run: |
+        bandit -r . -f json -o bandit-results.json
+        echo "=== SAST Analysis Summary ==="
+        
+        # Check for critical/high results
+        if [ -f bandit-results.json ]; then
+          HIGH_ISSUES=$(python -c "
+          import json
+          try:
+              with open('bandit-results.json') as f:
+                  data = json.load(f)
+                  high_issues = [i for i in data['results'] if i['issue_severity'] in ['HIGH', 'MEDIUM']]
+                  print(len(high_issues))
+          except:
+              print(0)
+          ")
+          
+          if [ "$HIGH_ISSUES" -gt 0 ]; then
+            echo "❌ Found $HIGH_ISSUES HIGH/MEDIUM vulnerabilities"
+            echo "Check bandit-results.json file"
+            exit 1
+          else
+            echo "✅ No HIGH/MEDIUM vulnerabilities found"
+          fi
+        fi
       
     - name: Upload scan results
       uses: actions/upload-artifact@v3
