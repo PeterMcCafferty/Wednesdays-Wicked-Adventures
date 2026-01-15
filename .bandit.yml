@@ -1,0 +1,27 @@
+# Bandit configuration file
+# Focus only on application code
+
+exclude_dirs:
+  - '*/venv'
+  - '*/tests'
+  - 'htmlcov'
+  - '*/migrations'
+  - '*.egg-info'
+  - '__pycache__'
+  - '.git'
+  - '.github'
+  - '.vscode'
+
+# Only scan Python files in app directory
+targets:
+  - 'flask_app/src/main/app'
+
+# Skip common false positives
+skips:
+  - 'B101'  # assert statements
+  - 'B404'  # import subprocess warnings
+  - 'B603'  # subprocess without shell=True
+  - 'B105'  # hardcoded password strings
+  - 'B106'  # hardcoded password in function
+  - 'B107'  # hardcoded password in URL
+  - 'B108'  # hardcoded tmp directory
