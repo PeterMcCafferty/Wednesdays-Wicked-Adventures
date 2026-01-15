@@ -54,7 +54,6 @@ def register_post():
     last_name = request.form.get('last_name')
     password = request.form.get('password')
 
-    # if true the email exists in the database, an unique email is required for registration, redirect to register page to try again
     user = User.query.filter_by(email=email).first() 
     if user: 
         flash('This email address already exists! Please try again!')

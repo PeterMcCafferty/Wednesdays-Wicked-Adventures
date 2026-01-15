@@ -21,11 +21,11 @@ def park_detail(park_id):
 def profile():
     return render_template('profile.html', name=current_user.name)
 
-@main.route('/bookings')
-@login_required
-def view_bookings():
-    bookings = Booking.query.filter_by(user_id=current_user.user_id).all()
-    return render_template('bookings.html', bookings=bookings)
+# @main.route('/bookings')
+# @login_required
+# def view_bookings():
+#     bookings = Booking.query.filter_by(user_id=current_user.user_id).all()
+#     return render_template('bookings.html', bookings=bookings)
 
 @main.route('/booking/new')
 @login_required

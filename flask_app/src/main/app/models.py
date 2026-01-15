@@ -1,3 +1,6 @@
+from wtforms import PasswordField
+from wtforms.validators import DataRequired, Email, EqualTo
+from werkzeug.security import generate_password_hash
 from flask_login import UserMixin, current_user
 from flask_admin.contrib.sqla import ModelView
 from flask_admin import AdminIndexView
@@ -33,6 +36,10 @@ class User(UserMixin,db.Model):
             'role_id': self.role_id
 
         }
+     
+    def __str__(self):
+        return self.name + ' ' + self.last_name
+    
 
 class Role(db.Model):
     __tablename__ = 'roles'
@@ -45,6 +52,9 @@ class Role(db.Model):
             'role_id': self.role_id,
             'name': self.name
         }
+    
+    def __str__(self):
+        return self.name
     
 class Park(db.Model):
     __tablename__ = 'parks'
@@ -84,6 +94,10 @@ class Park(db.Model):
  
         }
 
+    def __str__(self):
+        return self.name
+    
+
 class Booking(db.Model):
     __tablename__ = 'bookings'
     booking_id = db.Column(db.Integer, primary_key=True)
@@ -102,6 +116,9 @@ class Booking(db.Model):
             'num_tickets': self.num_tickets,
             'health_safety':self.health_safety
         }
+    
+    def __repr__(self):
+        return f''
 
 class AppModelView(ModelView):
     def is_accessible(self):
@@ -118,3 +135,77 @@ class AppIndexView(AdminIndexView):
     def inaccessible_callback(self, name, **kwargs):
         flash('!! ADMIN ACCESS ONLY!! Please login with Admin credentials!')
         return redirect(url_for("login.login"))
+    
+
+class UserView(AppModelView):
+
+    column_list = ('name', 'last_name', 'email', 'password', 'role')
+    column_labels = dict(name='Name', last_name= 'Last Name', email='Email', password='Password', role='Role')
+    column_filters = ('name', 'email')
+    column_formatters = dict(password=lambda v, c, m, p: '*****')
+    column_searchable_list = ('name', 'email')
+    column_sortable_list = ()
+    form_columns = ('name', 'last_name', 'email', 'password', 'role')
+    form_args = dict(
+        name=dict(validators=[DataRequired()]),
+        last_name=dict(validators=[DataRequired()]),
+        email=dict(validators=[DataRequired()]),
+        password=dict(validators=[DataRequired()]),
+        role_id=dict(validators=[DataRequired()])
+    )
+
+    def on_model_change(self, form, model, is_created):
+        model.password = generate_password_hash(model.password, method='pbkdf2:sha256')
+
+
+class RoleView(AppModelView):
+
+    column_list = ('name',)
+    column_labels = dict(name='Name')
+    column_filters = ('name',)
+    column_searchable_list = ('name',)
+    column_sortable_list = ()
+    form_columns = ('name',)
+    form_args = dict(
+        name=dict(validators=[DataRequired()])
+    )
+
+class BookingView(AppModelView):
+  
+    column_list = ('park','date', 'num_tickets', 'health_safety', 'user')
+    column_labels = dict(park='Park', date='Date', num_tickets='Number of Tickets', health_safety='Health & Safety', user='User')
+    column_filters = ('park', 'user')
+    column_searchable_list = ('park.name', 'user.name')
+    column_sortable_list = ()
+    form_columns = ('park', 'date', 'num_tickets', 'health_safety', 'user')
+    form_args = dict(
+        park=dict(validators=[DataRequired()]),
+        user=dict(validators=[DataRequired()]),
+        date=dict(validators=[DataRequired()]),
+        num_tickets=dict(validators=[DataRequired()]),
+        health_safety=dict(validators=[DataRequired()])
+    )
+
+class ParkView(AppModelView):
+  
+    column_list = ('name', 'location', 'description', 'image_path', 'short_description', 'slug', 'folder', 'hours','min_age', 'price','wait_time', 'height_requirement')
+    column_labels = dict(name='Name', location='Location', description='Description', image_path='Image Path', short_description='Short Description', slug='Slug', folder='Folder', hours='Hours', min_age='Min Age', price='Price', wait_time='Wait Time', height_requirement='Height Requirement')
+    column_filters = ('name', 'location')
+    column_searchable_list = ('name', 'location')
+    column_sortable_list = ()
+    form_columns = ('name', 'location', 'description', 'image_path', 'short_description', 'slug', 'folder', 'hours','min_age', 'price','wait_time', 'height_requirement')
+    form_args = dict(
+        name=dict(validators=[DataRequired()]),
+        location=dict(validators=[DataRequired()]),
+        description=dict(validators=[DataRequired()]),
+        image_path=dict(validators=[DataRequired()]),
+        short_description=dict(validators=[DataRequired()]),
+        slug=dict(validators=[DataRequired()]),
+        folder=dict(validators=[DataRequired()]),
+        hours=dict(validators=[DataRequired()]),
+        min_age=dict(validators=[DataRequired()]),
+        price=dict(validators=[DataRequired()]),
+        wait_time=dict(validators=[DataRequired()]),
+        height_requirement=dict(validators=[DataRequired()]),
+    )
+
