@@ -7,12 +7,26 @@ on:
     branches: [ main ]
 
 jobs:
-  sast-scan:
+  bandit-scan:
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Run SAST Scan
-      run: echo "SAST scan placeholder - escolheremos a ferramenta no próximo passo"
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+        
+    - name: Install Bandit
+      run: pip install bandit
+        
+    - name: Run Bandit SAST scan
+      run: bandit -r . -f json -o bandit-results.json || true
+      
+    - name: Upload scan results
+      uses: actions/upload-artifact@v3
+      with:
+        name: bandit-results
+        path: bandit-results.json
