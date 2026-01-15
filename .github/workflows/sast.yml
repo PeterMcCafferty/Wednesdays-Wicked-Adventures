@@ -2,7 +2,7 @@ name: SAST Security Scan
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, UAT ]
   pull_request:
     branches: [ main ]
 
@@ -70,7 +70,7 @@ jobs:
         fi
       
     - name: Upload scan results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: bandit-results
         path: bandit-results.json
