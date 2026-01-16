@@ -1,0 +1,169 @@
+# ============================================================
+# SAST SECURITY SCAN WORKFLOW (REUSABLE)
+# ============================================================
+name: SAST Security Scan
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: "Python version to use"
+        required: true
+        type: string
+        default: "3.11"
+      
+      working-directory:
+        description: "Directory where the project resides"
+        required: true
+        type: string
+        default: "."
+      
+      fail-on-issues:
+        description: "Fail the pipeline if high/medium issues found"
+        required: true
+        type: boolean
+        default: true
+      
+      config-path:
+        description: "Path to Bandit config file"
+        required: false
+        type: string
+        default: ".bandit.yml"
+
+jobs:
+  bandit-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # ------------------------------------------------------
+      # Step 1: Checkout repository
+      # ------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # ------------------------------------------------------
+      # Step 2: Set up Python
+      # ------------------------------------------------------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+      
+      # ------------------------------------------------------
+      # Step 3: Install Bandit
+      # ------------------------------------------------------
+      - name: Install Bandit
+        run: pip install bandit
+      
+      # ------------------------------------------------------
+      # Step 4: Run Bandit SAST scan
+      # ------------------------------------------------------
+      - name: Run Bandit Scan
+        working-directory: ${{ inputs.working-directory }}
+        id: scan
+        run: |
+          # Check if config file exists
+          if [ ! -f "${{ inputs.config-path }}" ]; then
+            echo "⚠️  Config file ${{ inputs.config-path }} not found, using default settings"
+            CONFIG_ARG=""
+          else
+            CONFIG_ARG="-c ${{ inputs.config-path }}"
+          fi
+          
+          # Run Bandit
+          bandit $CONFIG_ARG -r . -f json -o bandit-results.json || true
+      
+      # ------------------------------------------------------
+      # Step 5: Analyze results and decide on failure
+      # ------------------------------------------------------
+      - name: Analyze Scan Results
+        working-directory: ${{ inputs.working-directory }}
+        id: analyze
+        run: |
+          echo "=== SAST Analysis Summary ==="
+          
+          if [ ! -f "bandit-results.json" ]; then
+            echo "❌ No scan results found"
+            echo "::set-output name=high_count::0"
+            echo "::set-output name=medium_count::0"
+            echo "::set-output name=low_count::0"
+            echo "::set-output name=has_critical::false"
+            exit 0
+          fi
+          
+          # Count issues using Python (more reliable than bash)
+          python -c "
+import json
+import sys
+
+try:
+    with open('bandit-results.json', 'r') as f:
+        data = json.load(f)
+    
+    high = 0
+    medium = 0
+    low = 0
+    undefined = 0
+    
+    for issue in data.get('results', []):
+        severity = issue.get('issue_severity', 'UNDEFINED').upper()
+        if severity == 'HIGH':
+            high += 1
+        elif severity == 'MEDIUM':
+            medium += 1
+        elif severity == 'LOW':
+            low += 1
+        else:
+            undefined += 1
+    
+    print(f'::set-output name=high_count::{high}')
+    print(f'::set-output name=medium_count::{medium}')
+    print(f'::set-output name=low_count::{low}')
+    print(f'::set-output name=has_critical::{high + medium > 0}')
+    
+    print(f'HIGH: {high} | MEDIUM: {medium} | LOW: {low} | UNDEFINED: {undefined}')
+    
+except Exception as e:
+    print(f'Error reading results: {e}')
+    print('::set-output name=high_count::0')
+    print('::set-output name=medium_count::0')
+    print('::set-output name=low_count::0')
+    print('::set-output name=has_critical::false')
+"
+      
+      # ------------------------------------------------------
+      # Step 6: Conditional failure based on results
+      # ------------------------------------------------------
+      - name: Check for Critical Issues
+        if: ${{ steps.analyze.outputs.has_critical == 'true' && inputs.fail-on-issues == true }}
+        run: |
+          echo "❌ Found ${{ steps.analyze.outputs.high_count }} HIGH and ${{ steps.analyze.outputs.medium_count }} MEDIUM vulnerabilities"
+          echo "Pipeline failed due to security issues"
+          exit 1
+      
+      # ------------------------------------------------------
+      # Step 7: Summary (always runs)
+      # ------------------------------------------------------
+      - name: Display Summary
+        run: |
+          if [ "${{ steps.analyze.outputs.has_critical }}" = "true" ] && [ "${{ inputs.fail-on-issues }}" = "false" ]; then
+            echo "⚠️  Found critical issues but continuing (fail-on-issues: false)"
+          elif [ "${{ steps.analyze.outputs.has_critical }}" = "true" ]; then
+            echo "✅ Pipeline would fail but continue for review"
+          else
+            echo "✅ No critical vulnerabilities found"
+            if [ "${{ steps.analyze.outputs.low_count }}" != "0" ]; then
+              echo "⚠️  Found ${{ steps.analyze.outputs.low_count }} LOW severity issues (review recommended)"
+            fi
+          fi
+      
+      # ------------------------------------------------------
+      # Step 8: Upload results artifact
+      # ------------------------------------------------------
+      - name: Upload Scan Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-results-${{ github.run_id }}
+          path: ${{ inputs.working-directory }}/bandit-results.json
+          retention-days: 30

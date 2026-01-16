@@ -1,10 +1,9 @@
 # ============================================================
-# SAMPLE TEST WORKFLOW TEMPLATE
+# SAMPLE TEST WORKFLOW TEMPLATE 
 #
 # PURPOSE
 # -------
-# This workflow is NOT a real test.
-# It is the OFFICIAL TEMPLATE and CONTRACT for creating new
+# This workflow is a TEMPLATE and CONTRACT for creating new
 # test workflows in this repository.
 #
 # How to use:
@@ -14,26 +13,20 @@
 #
 # IMPORTANT RULES
 # ---------------
-# - DO NOT add triggers like `push` or `pull_request`
-# - This workflow MUST be called only by `pipeline.yaml`
-# - Use `workflow_call` and follow the input contract
+# - DO NOT add triggers like push or pull_request
+# - This workflow MUST be invoked only by pipeline.yaml
+# - Use workflow_call and follow the input contract
 # - Keep ONE job per test workflow
 # ============================================================
 
 name: Sample Test Template
 
-# ------------------------------------------------------------
-# This workflow is reusable and can only be invoked
-# by another workflow (the pipeline orchestrator).
-# ------------------------------------------------------------
 on:
   workflow_call:
     inputs:
-
       # ------------------------------------------------------
       # STANDARD INPUTS (REQUIRED FOR ALL TEST WORKFLOWS)
       # ------------------------------------------------------
-
       python-version:
         description: "Python version to use for this test"
         required: true
@@ -52,10 +45,6 @@ on:
       # ------------------------------------------------------
       # OPTIONAL / EXAMPLE INPUTS
       # ------------------------------------------------------
-      # These inputs show how a test can define its own
-      # configuration while still respecting the contract.
-      # ------------------------------------------------------
-
       config-file:
         description: "Optional configuration file for the test tool"
         required: false
@@ -68,11 +57,12 @@ on:
         type: string
         default: "."
 
-# ------------------------------------------------------------
-# JOBS
-# Each test workflow MUST define exactly ONE job.
-# The job name should reflect the test purpose.
-# ------------------------------------------------------------
+      build-artifacts-path:
+        description: "Path to artifacts from the build job (optional)"
+        required: false
+        type: string
+        default: ""
+
 jobs:
   sample-test:
     runs-on: ubuntu-latest
@@ -80,17 +70,12 @@ jobs:
     steps:
       # ------------------------------------------------------
       # Step 1: Checkout repository
-      # Mandatory for almost all tests
       # ------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
       # ------------------------------------------------------
-      # Step 2: Set up runtime (example with Python)
-      #
-      # Even if your test does not use Python,
-      # you MUST accept the input for consistency.
-      # You may ignore it internally if not needed.
+      # Step 2: Set up Python
       # ------------------------------------------------------
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -98,36 +83,36 @@ jobs:
           python-version: ${{ inputs.python-version }}
 
       # ------------------------------------------------------
-      # Step 3: Install tool dependencies (EXAMPLE)
-      #
-      # Replace this with the installation steps
-      # required by your specific test.
+      # Step 3: Download build artifacts (optional)
+      # ------------------------------------------------------
+      - name: Download build artifacts
+        if: ${{ inputs.build-artifacts-path != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: ${{ inputs.build-artifacts-path }}
+
+      # ------------------------------------------------------
+      # Step 4: Install test dependencies (example)
       # ------------------------------------------------------
       - name: Install test dependencies
         working-directory: ${{ inputs.working-directory }}
         run: |
           echo "Install test-specific dependencies here"
+          # Example: pip install -r requirements.txt
 
       # ------------------------------------------------------
-      # Step 4: Run the test (EXAMPLE)
-      #
-      # This is where the real test logic goes.
-      # The test should produce a clear success or failure.
+      # Step 5: Run the test (example)
       # ------------------------------------------------------
       - name: Run test
         working-directory: ${{ inputs.working-directory }}
         run: |
-          echo "Run your test here"
+          echo "Run your test logic here"
           echo "Config file: ${{ inputs.config-file }}"
           echo "Scan path: ${{ inputs.scan-path }}"
 
       # ------------------------------------------------------
-      # Step 5: Enforce failure policy
-      #
-      # If fail-on-issues is true, this step MUST
-      # exit with a non-zero code when issues are found.
-      #
-      # Replace the example logic with real checks.
+      # Step 6: Enforce failure policy
       # ------------------------------------------------------
       - name: Enforce test policy
         if: ${{ inputs.fail-on-issues }}
@@ -137,9 +122,7 @@ jobs:
           # exit 1  # Uncomment in real tests when issues are detected
 
       # ------------------------------------------------------
-      # Step 6: Upload artifacts (OPTIONAL BUT RECOMMENDED)
-      #
-      # Use this to upload reports, logs, or result files.
+      # Step 7: Upload test artifacts (optional but recommended)
       # ------------------------------------------------------
       - name: Upload test artifacts
         if: always()
