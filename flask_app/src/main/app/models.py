@@ -1,5 +1,4 @@
-# from wtforms import PasswordField
-from wtforms.validators import DataRequired, Email #, EqualTo
+from wtforms.validators import DataRequired, Email 
 from werkzeug.security import generate_password_hash
 from flask_login import UserMixin, current_user
 from flask_admin.contrib.sqla import ModelView
@@ -125,7 +124,7 @@ class AppModelView(ModelView):
         return (current_user.is_authenticated and current_user.has_role('admin'))
     
     def inaccessible_callback(self, name, **kwargs):
-        flash('!! ADMIN ACCESS ONLY!! Please login with Admin credentials!')
+        flash('ADMIN ACCESS ONLY! Please login with Admin credentials!')
         return redirect(url_for("login.login"))
 
 class AppIndexView(AdminIndexView):
@@ -133,7 +132,7 @@ class AppIndexView(AdminIndexView):
         return (current_user.is_authenticated and current_user.has_role('admin'))
     
     def inaccessible_callback(self, name, **kwargs):
-        flash('!! ADMIN ACCESS ONLY!! Please login with Admin credentials!')
+        flash('ADMIN ACCESS ONLY! Please login with Admin credentials!')
         return redirect(url_for("login.login"))
     
 

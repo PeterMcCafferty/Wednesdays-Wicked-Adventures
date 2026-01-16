@@ -27,7 +27,7 @@ def create_app(config_name="development"):
     db.init_app(app)
     config[config_name].init_app(app)
 
-    from .models import User, Role, Booking, Park, AppModelView, AppIndexView, UserView, RoleView, BookingView, ParkView
+    from .models import User, Role, Booking, Park, AppIndexView, UserView, RoleView, BookingView, ParkView
     
     # Configure Flask-Login
     login_manager = LoginManager()
@@ -35,17 +35,12 @@ def create_app(config_name="development"):
     login_manager.init_app(app)
     
     # User loader function for Flask-Login
-    #from .models import User
     @login_manager.user_loader
     def load_user(user_id):
         return db.session.get(User, int(user_id))
     
     # Flask-Admin
-    admin = Admin (app, name='Wednesdays-Wicked-Adventures - Admin', template_mode='bootstrap4', index_view=AppIndexView())
-    # admin.add_view(AppModelView(User, db.session))
-    # admin.add_view(AppModelView(Role, db.session))
-    # admin.add_view(AppModelView(Booking, db.session))
-    # admin.add_view(AppModelView(Park, db.session))
+    admin = Admin (app, name='Wednesdays-Wicked-Adventures', template_mode='bootstrap4', index_view=AppIndexView())
     admin.add_view(UserView(User, db.session))
     admin.add_view(RoleView(Role, db.session))
     admin.add_view(BookingView(Booking, db.session))
