@@ -1,5 +1,5 @@
 # ============================================================
-# SAST SECURITY SCAN WORKFLOW (REUSABLE)
+# SAST SECURITY SCAN WORKFLOW (SIMPLIFIED)
 # ============================================================
 name: SAST Security Scan
 
@@ -11,19 +11,16 @@ on:
         required: true
         type: string
         default: "3.11"
-      
       working-directory:
         description: "Directory where the project resides"
         required: true
         type: string
         default: "."
-      
       fail-on-issues:
         description: "Fail the pipeline if high/medium issues found"
         required: true
         type: boolean
         default: true
-      
       config-path:
         description: "Path to Bandit config file"
         required: false
@@ -35,138 +32,72 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      # ------------------------------------------------------
-      # Step 1: Checkout repository
-      # ------------------------------------------------------
+      # 1. Checkout
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      # ------------------------------------------------------
-      # Step 2: Set up Python
-      # ------------------------------------------------------
+      # 2. Setup Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ inputs.python-version }}
       
-      # ------------------------------------------------------
-      # Step 3: Install Bandit
-      # ------------------------------------------------------
+      # 3. Install Bandit
       - name: Install Bandit
         run: pip install bandit
       
-      # ------------------------------------------------------
-      # Step 4: Run Bandit SAST scan
-      # ------------------------------------------------------
-      - name: Run Bandit Scan
+      # 4. Run Bandit Scan
+      - name: Run Bandit Security Scan
         working-directory: ${{ inputs.working-directory }}
-        id: scan
+        id: bandit-scan
+        continue-on-error: ${{ !inputs.fail-on-issues }}
         run: |
-          # Check if config file exists
+          # Check config file
           if [ ! -f "${{ inputs.config-path }}" ]; then
-            echo "⚠️  Config file ${{ inputs.config-path }} not found, using default settings"
+            echo "ℹ️  Using default Bandit settings"
             CONFIG_ARG=""
           else
             CONFIG_ARG="-c ${{ inputs.config-path }}"
           fi
           
-          # Run Bandit
-          bandit $CONFIG_ARG -r . -f json -o bandit-results.json || true
-      
-      # ------------------------------------------------------
-      # Step 5: Analyze results and decide on failure
-      # ------------------------------------------------------
-      - name: Analyze Scan Results
-        working-directory: ${{ inputs.working-directory }}
-        id: analyze
-        run: |
-          echo "=== SAST Analysis Summary ==="
+          # Run Bandit with exit code control
+          echo "🔍 Running Bandit security scan..."
+          bandit $CONFIG_ARG -r . -f json -o bandit-results.json
           
-          if [ ! -f "bandit-results.json" ]; then
-            echo "❌ No scan results found"
-            echo "high_count=0" >> $GITHUB_OUTPUT
-            echo "medium_count=0" >> $GITHUB_OUTPUT
-            echo "low_count=0" >> $GITHUB_OUTPUT
-            echo "has_critical=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          
-          # Count issues usando Python com HEREDOC correto
-          python3 << 'EOF'
-import json
-import os
-
-try:
-    with open('bandit-results.json', 'r') as f:
-        data = json.load(f)
-    
-    high = 0
-    medium = 0
-    low = 0
-    undefined = 0
-    
-    for issue in data.get('results', []):
-        severity = issue.get('issue_severity', 'UNDEFINED').upper()
-        if severity == 'HIGH':
-            high += 1
-        elif severity == 'MEDIUM':
-            medium += 1
-        elif severity == 'LOW':
-            low += 1
-        else:
-            undefined += 1
-    
-    # Right syntax for GitHub Actions
-    with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
-        print(f'high_count={high}', file=fh)
-        print(f'medium_count={medium}', file=fh)
-        print(f'low_count={low}', file=fh)
-        print(f'has_critical={high + medium > 0}', file=fh)
-    
-    print(f'HIGH: {high} | MEDIUM: {medium} | LOW: {low} | UNDEFINED: {undefined}')
-    
-except Exception as e:
-    print(f'Error reading results: {e}')
-    with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
-        print('high_count=0', file=fh)
-        print('medium_count=0', file=fh)
-        print('low_count=0', file=fh)
-        print('has_critical=false', file=fh)
-EOF
-      
-      # ------------------------------------------------------
-      # Step 6: Conditional failure based on results
-      # ------------------------------------------------------
-      - name: Check for Critical Issues
-        if: ${{ steps.analyze.outputs.has_critical == 'true' && inputs.fail-on-issues == true }}
-        run: |
-          echo "❌ Found ${{ steps.analyze.outputs.high_count }} HIGH and ${{ steps.analyze.outputs.medium_count }} MEDIUM vulnerabilities"
-          echo "Pipeline failed due to security issues"
-          exit 1
-      
-      # ------------------------------------------------------
-      # Step 7: Summary (always runs)
-      # ------------------------------------------------------
-      - name: Display Summary
-        run: |
-          if [ "${{ steps.analyze.outputs.has_critical }}" = "true" ] && [ "${{ inputs.fail-on-issues }}" = "false" ]; then
-            echo "⚠️  Found critical issues but continuing (fail-on-issues: false)"
-          elif [ "${{ steps.analyze.outputs.has_critical }}" = "true" ]; then
-            echo "✅ Pipeline would fail but continue for review"
-          else
-            echo "✅ No critical vulnerabilities found"
-            if [ "${{ steps.analyze.outputs.low_count }}" != "0" ]; then
-              echo "⚠️  Found ${{ steps.analyze.outputs.low_count }} LOW severity issues (review recommended)"
+          # Check if results file was created
+          if [ -f "bandit-results.json" ]; then
+            echo "✅ Scan completed successfully"
+            
+            # Simple count using jq (installed by default)
+            HIGH=$(jq '[.results[] | select(.issue_severity == "HIGH")] | length' bandit-results.json || echo "0")
+            MEDIUM=$(jq '[.results[] | select(.issue_severity == "MEDIUM")] | length' bandit-results.json || echo "0")
+            LOW=$(jq '[.results[] | select(.issue_severity == "LOW")] | length' bandit-results.json || echo "0")
+            
+            echo "📊 Scan Results:"
+            echo "   HIGH severity: $HIGH"
+            echo "   MEDIUM severity: $MEDIUM"
+            echo "   LOW severity: $LOW"
+            
+            if [ "$HIGH" -gt 0 ] || [ "$MEDIUM" -gt 0 ]; then
+              echo "⚠️  Found $HIGH HIGH and $MEDIUM MEDIUM severity issues"
+              
+              if [ "${{ inputs.fail-on-issues }}" = "true" ]; then
+                echo "❌ Failing pipeline due to security issues"
+                exit 1
+              else
+                echo "⚠️  Continuing pipeline (fail-on-issues is false)"
+              fi
+            else
+              echo "✅ No HIGH or MEDIUM severity issues found"
             fi
+          else
+            echo "❌ No results file generated"
           fi
       
-      # ------------------------------------------------------
-      # Step 8: Upload results artifact
-      # ------------------------------------------------------
-      - name: Upload Scan Results
+      # 5. Upload results (always, even if failed)
+      - name: Upload Security Scan Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bandit-results-${{ github.run_number }}
+          name: security-scan-results
           path: ${{ inputs.working-directory }}/bandit-results.json
-          retention-days: 30
