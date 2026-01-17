@@ -21,12 +21,6 @@ def park_detail(park_id):
 def profile():
     return render_template('profile.html', name=current_user.name)
 
-@main.route('/bookings')
-@login_required
-def view_bookings():
-    bookings = Booking.query.filter_by(user_id=current_user.user_id).all()
-    return render_template('bookings.html', bookings=bookings)
-
 @main.route('/booking/new')
 @login_required
 def new_booking():
@@ -54,6 +48,7 @@ def booking():
     return redirect(url_for('main.profile'))
 
 @main.route('/health-safety-guidelines')
+@login_required
 def health_safety_guidelines():
     current_date = datetime.now()
     return render_template('health_safety_guidelines.html', now=current_date)

@@ -1,7 +1,10 @@
-Flask
-flask-sqlalchemy 
-PyMySQL
-flask-login
+Flask==3.1.2
+flask-sqlalchemy==3.1.1 
+SQLAlchemy-Utils==0.42.1
+PyMySQL==1.1.2
+flask-login==0.6.3
+Flask-Admin==1.6.1
+WTForms==3.1.2
 
 pytest==7.4.3
 pytest-cov==4.1.0
