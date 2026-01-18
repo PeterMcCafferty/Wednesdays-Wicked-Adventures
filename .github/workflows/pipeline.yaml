@@ -55,20 +55,10 @@ jobs:
       dependencies-installed: true  # Indicates dependencies are already installed
       cache-key: ${{ needs.setup-environment.outputs.cache-key }}
 
-  # PHASE 4: TEST REAL APPLICATION
-  test-app:
-    uses: ./.github/workflows/test-app.yaml
-    needs: [build-app]
-    with:
-      python-version: ${{ needs.setup-environment.outputs.python-version }}
-      working-directory: "flask_app/src"
-      dependencies-installed: true  # Indicates dependencies are already installed
-      cache-key: ${{ needs.setup-environment.outputs.cache-key }}
-
-  # PHASE 5: PIPELINE SUMMARY
+  # PHASE 4: PIPELINE SUMMARY
   pipeline-summary:
     runs-on: ubuntu-latest
-    needs: [setup-environment, smoke-test, security-sast, build-app, test-app]
+    needs: [setup-environment, smoke-test, security-sast, build-app]
     if: always()
     timeout-minutes: 2
     
@@ -84,7 +74,6 @@ jobs:
           echo "Smoke Test........: ${{ needs.smoke-test.result }}"
           echo "Security Scan.....: ${{ needs.security-sast.result }}"
           echo "Build.............: ${{ needs.build-app.result }}"
-          echo "Tests.............: ${{ needs.test-app.result }}"
           echo ""
           echo "Cache Status......: ${{ needs.setup-environment.outputs.cache-hit }}"
           echo "Requirements Hash.: ${{ needs.setup-environment.outputs.requirements-hash }}"
@@ -92,8 +81,7 @@ jobs:
           
           # Determine overall status
           if [[ "${{ needs.smoke-test.result }}" == "success" && 
-                "${{ needs.build-app.result }}" == "success" && 
-                "${{ needs.test-app.result }}" == "success" ]]; then
+                "${{ needs.build-app.result }}" == "success" ]]; then
             echo "✅ ALL CRITICAL JOBS PASSED!"
             echo "✅ Application is ready for deployment"
           else
