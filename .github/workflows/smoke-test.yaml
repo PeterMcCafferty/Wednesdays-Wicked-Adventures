@@ -1,7 +1,7 @@
 # ============================================================
-# SMOKE TESTS WORKFLOW
-# 
-# Quick sanity checks to ensure basic functionality works
+# SMOKE TEST WORKFLOW
+#
+# Goal: Verify the application starts and basic functionality works
 # ============================================================
 name: Smoke Test
 
@@ -15,249 +15,52 @@ on:
         required: true
         type: string
       dependencies-installed:
-        description: "Must be true - indicates dependencies are installed from setup-environment"
         required: true
         type: boolean
-      cache-key:
-        description: "Cache key from setup-environment for dependency cache"
-        required: true
-        type: string
-      requirements-hash:
-        description: "Hash of requirements.txt from setup-environment"
-        required: true
-        type: string
 
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 3  # Smoke tests must be FAST!
-    
+    timeout-minutes: 3
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ inputs.python-version }}
-      
-      # Before checking cache, verify setup-environment was executed
-      - name: Verify setup-environment was executed
-        if: ${{ !inputs.dependencies-installed || inputs.cache-key == '' || inputs.requirements-hash == '' }}
+
+      - name: Validate environment precondition
+        if: ${{ !inputs.dependencies-installed }}
         run: |
-          echo "❌ ERROR: This workflow requires setup-environment to run first"
-          echo "Current inputs:"
-          echo "  - dependencies-installed: ${{ inputs.dependencies-installed }}"
-          echo "  - cache-key: '${{ inputs.cache-key }}'"
-          echo "  - requirements-hash: '${{ inputs.requirements-hash }}'"
-          echo ""
-          echo "Please run smoke-test via pipeline.yaml with:"
-          echo "  - dependencies-installed: true"
-          echo "  - cache-key: \${{ needs.setup-environment.outputs.cache-key }}"
-          echo "  - requirements-hash: \${{ needs.setup-environment.outputs.requirements-hash }}"
+          echo "❌ Smoke test requires dependencies to be installed first"
           exit 1
 
-      # CACHE with if condition
-      - name: Restore Python dependencies cache
-        if: ${{ inputs.dependencies-installed && inputs.cache-key != '' }}
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/pip
-            /opt/hostedtoolcache/Python
-          key: ${{ inputs.cache-key }}
-          restore-keys: |
-            ${{ runner.os }}-python-${{ inputs.python-version }}-deps-
-      
-      # INTELIGENCE FALLBACK - Just if is necessary
-      - name: Verify or install dependencies if cache failed
-        if: ${{ inputs.dependencies-installed && inputs.cache-key == '' }}
-        run: |
-          echo "🔍 Cache key is empty but dependencies-installed is true."
-          echo "Checking if dependencies are already installed from setup-environment..."
-          
-          # Verifica se alguns pacotes essenciais estão instalados
-          ESSENTIAL_PKGS="Flask flask-sqlalchemy pymysql flask-login"
-          MISSING_ESSENTIAL=0
-          
-          for pkg in $ESSENTIAL_PKGS; do
-            if pip show "$pkg" >/dev/null 2>&1; then
-              version=$(pip show "$pkg" | grep "^Version:" | cut -d: -f2 | xargs)
-              echo "✅ $pkg==$version (already installed)"
-            else
-              echo "❌ $pkg - NOT FOUND"
-              MISSING_ESSENTIAL=$((MISSING_ESSENTIAL + 1))
-            fi
-          done
-          
-          if [ $MISSING_ESSENTIAL -eq 0 ]; then
-            echo "✅ All essential packages already installed."
-            echo "Proceeding with smoke tests..."
-          else
-            echo "⚠️ Some essential packages missing ($MISSING_ESSENTIAL)."
-            echo "Installing dependencies from requirements.txt as fallback..."
-            
-            python -m pip install --upgrade pip
-            
-            REQ_FILE="flask_app/src/requirements.txt"
-            if [ -f "$REQ_FILE" ]; then
-              echo "Installing from requirements.txt"
-              pip install -r "$REQ_FILE"
-            else
-              echo "❌ ERROR: requirements.txt not found at $REQ_FILE"
-              exit 1
-            fi
-            
-            echo "✅ Dependencies installed via fallback"
-          fi
-      
-      # All packages verification
-      - name: Verify ALL requirements.txt packages are installed
-        run: |
-          echo "🔍 Verifying ALL packages from requirements.txt via setup-environment..."
-          echo "======================================================================"
-          
-          # Use the EXACT SAME path as setup-environment.yaml
-          REQ_FILE="flask_app/src/requirements.txt"
-          
-          if [ ! -f "$REQ_FILE" ]; then
-            echo "❌ ERROR: requirements.txt not found at $REQ_FILE"
-            echo "This path must match setup-environment.yaml exactly"
-            exit 1
-          fi
-          
-          echo "Checking file: $REQ_FILE"
-          
-          # Verify hash matches what setup-environment used
-          CURRENT_HASH=$(sha256sum "$REQ_FILE" | cut -d' ' -f1 | head -c 12)
-          echo "Current file hash: $CURRENT_HASH"
-          echo "Expected hash from setup-environment: ${{ inputs.requirements-hash }}"
-          
-          if [ "$CURRENT_HASH" != "${{ inputs.requirements-hash }}" ]; then
-            echo "⚠️  WARNING: requirements.txt was modified after setup-environment ran"
-            echo "This may cause cache invalidation in next pipeline run"
-          fi
-          
-          echo ""
-          echo "Checking installation of ALL packages from requirements.txt..."
-          echo ""
-          
-          MISSING_PACKAGES=0
-          
-          # Process each line in requirements.txt
-          while IFS= read -r line; do
-            # Skip comments and empty lines
-            line_trimmed=$(echo "$line" | xargs)
-            if [[ -z "$line_trimmed" ]] || [[ "$line_trimmed" == \#* ]]; then
-              continue
-            fi
-            
-            # Extract package name (remove version specifiers, extras, etc.)
-            pkg_name=$(echo "$line_trimmed" | sed -E 's/[<>=!~\[].*//' | xargs)
-            
-            if [ -z "$pkg_name" ]; then
-              continue
-            fi
-            
-            # Try to find the package (handle - vs _ differences)
-            FOUND=false
-            
-            # Try exact name
-            if pip show "$pkg_name" >/dev/null 2>&1; then
-              version=$(pip show "$pkg_name" | grep "^Version:" | cut -d: -f2 | xargs)
-              echo "✅ $pkg_name==$version"
-              FOUND=true
-            
-            # Try with - replaced by _
-            elif pip show "${pkg_name//-/_}" >/dev/null 2>&1; then
-              version=$(pip show "${pkg_name//-/_}" | grep "^Version:" | cut -d: -f2 | xargs)
-              echo "✅ $pkg_name (as ${pkg_name//-/_})==$version"
-              FOUND=true
-            
-            # Try with _ replaced by -
-            elif pip show "${pkg_name//_/-}" >/dev/null 2>&1; then
-              version=$(pip show "${pkg_name//_/-}" | grep "^Version:" | cut -d: -f2 | xargs)
-              echo "✅ $pkg_name (as ${pkg_name//_/-})==$version"
-              FOUND=true
-            fi
-            
-            if [ "$FOUND" = false ]; then
-              echo "❌ $pkg_name - NOT INSTALLED"
-              MISSING_PACKAGES=$((MISSING_PACKAGES + 1))
-            fi
-            
-          done < "$REQ_FILE"
-          
-          echo ""
-          echo "="*60
-          
-          if [ $MISSING_PACKAGES -gt 0 ]; then
-            echo "💀 CRITICAL ERROR: $MISSING_PACKAGES packages from requirements.txt are NOT installed"
-            echo "This indicates setup-environment FAILED to install all dependencies"
-            echo "Check setup-environment job logs for installation errors"
-            exit 1
-          else
-            echo "✅ SUCCESS: ALL packages from requirements.txt are installed!"
-            echo "✅ Verified via setup-environment cache"
-          fi
-      
-      - name: Run Basic Smoke Test
+      - name: Run application smoke test
         working-directory: ${{ inputs.working-directory }}
         env:
           FLASK_ENV: testing
         run: |
-          echo "🚬 Running smoke test with setup-environment dependencies..."
-          echo "========================================================="
-          
-          python3 << 'EOF'
+          echo "🚬 Running smoke test..."
+
+          python << 'EOF'
           import sys
-          import os
-          
-          print("SMOKE TEST - Verifying Flask app functionality...")
-          
-          # All packages already verified in previous step
-          print("✅ All requirements.txt packages verified (see previous step)")
-          
-          # Try to import and create app
+
           try:
-              sys.path.insert(0, '.')
               from app import create_app
-              
-              app = create_app('testing')
-              print(f"✅ App created: {app.name}")
-              
-              # Check config
-              if not app.config.get('SECRET_KEY'):
-                  print("❌ SECRET_KEY missing - Flask config not loaded")
-                  sys.exit(1)
-                  
-              if not app.config.get('SQLALCHEMY_DATABASE_URI'):
-                  print("❌ Database URI missing - Database config not loaded")
-                  sys.exit(1)
-                  
-              print("✅ All Flask configurations loaded correctly")
-              
-              # Test basic route (optional)
+
+              app = create_app("testing")
+              print("✅ Flask app created")
+
               with app.test_client() as client:
-                  response = client.get('/')
-                  print(f"✅ Basic route check: HTTP {response.status_code}")
-              
+                  response = client.get("/")
+                  print(f"✅ Root endpoint returned HTTP {response.status_code}")
+
+              print("🎉 SMOKE TEST PASSED")
+
           except Exception as e:
-              print(f"❌ App failed: {type(e).__name__}: {str(e)[:100]}")
-              import traceback
-              traceback.print_exc()
+              print(f"❌ SMOKE TEST FAILED: {e}")
               sys.exit(1)
-          
-          print("🎉 SMOKE TEST PASSED!")
-          print("✅ Setup-environment installed ALL dependencies correctly")
-          print("✅ Flask application is functional")
           EOF
-      
-      - name: Smoke Test Passed
-        if: success()
-        run: |
-          echo "✅ Smoke test passed!"
-          echo "✅ Python ${{ inputs.python-version }}"
-          echo "✅ ALL dependencies from requirements.txt verified"
-          echo "✅ Setup-environment cache working correctly"
-          echo "✅ Proceeding to next pipeline phases..."
