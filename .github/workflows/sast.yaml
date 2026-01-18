@@ -89,11 +89,14 @@ jobs:
       
       # 5. Run Bandit Scan
       - name: Run Bandit Security Scan
-        working-directory: ${{ inputs.working-directory }}
         id: bandit-scan
         continue-on-error: ${{ !inputs.fail-on-issues }}
         run: |
-          # Check config file
+          # Navigate to the correct directory
+          cd "${{ inputs.working-directory }}"
+          echo "🔍 Running Bandit security scan in: $(pwd)"
+          
+          # Check config file (relative to working directory)
           if [ ! -f "${{ inputs.config-path }}" ]; then
             echo "ℹ️ Using default Bandit settings"
             CONFIG_ARG=""

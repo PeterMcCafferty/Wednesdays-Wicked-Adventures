@@ -1,8 +1,8 @@
 # ============================================================
 # BUILD WORKFLOW
 #
-# This workflow sets up the application environment and
-# installs all dependencies. It can be reused by all test workflows.
+# This workflow builds the application using dependencies
+# already installed by setup-environment.
 # ============================================================
 
 name: Build App
@@ -18,12 +18,22 @@ on:
         description: "Directory of the app to build"
         required: true
         type: string
+      dependencies-installed:
+        description: "Indicates if dependencies are already installed from setup-environment"
+        required: false
+        type: boolean
+        default: false
+      cache-key:
+        description: "Cache key from setup-environment for dependency cache"
+        required: false
+        type: string
+        default: ""
 
 jobs:
   build:
     name: Build Application
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10  # Reduced since no installation needed
     
     steps:
       # Step 1: Checkout code
@@ -36,40 +46,111 @@ jobs:
         with:
           python-version: ${{ inputs.python-version }}
 
-      # Step 3: Cache pip dependencies
-      - name: Cache pip dependencies
-        id: cache-pip
-        uses: actions/cache@v3
+      # Step 3: Restore Python dependencies cache
+      - name: Restore Python dependencies cache
+        if: ${{ inputs.dependencies-installed && inputs.cache-key != '' }}
+        uses: actions/cache@v4
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          path: |
+            ~/.cache/pip
+            /opt/hostedtoolcache/Python
+          key: ${{ inputs.cache-key }}
           restore-keys: |
-            ${{ runner.os }}-pip-
+            ${{ runner.os }}-python-${{ inputs.python-version }}-deps-
 
-      # Step 4: Install dependencies
-      - name: Install dependencies
+      # Step 4: Verify or install dependencies
+      - name: Verify dependencies or install
         working-directory: ${{ inputs.working-directory }}
         run: |
-          python -m pip install --upgrade pip
+          echo "🔧 BUILD PHASE"
+          echo "============="
           
-          # Only install if cache is not restored
-          if [ -f requirements.txt ] && [ "${{ steps.cache-pip.outputs.cache-hit }}" != 'true' ]; then
-            echo "Cache miss: installing dependencies from requirements.txt"
-            pip install -r requirements.txt
-          elif [ -f requirements.txt ]; then
-            echo "Cache hit: verifying dependencies"
-            pip install -r requirements.txt
+          if [ "${{ inputs.dependencies-installed }}" = "true" ] && [ -n "${{ inputs.cache-key }}" ]; then
+            echo "✅ Using dependencies from setup-environment"
+            echo "Verifying build requirements..."
+            
+            # Check if basic build requirements are available
+            REQUIRED_FOR_BUILD="Flask setuptools"
+            for pkg in $REQUIRED_FOR_BUILD; do
+              if pip show "$pkg" >/dev/null 2>&1; then
+                version=$(pip show "$pkg" | grep "^Version:" | cut -d: -f2 | xargs)
+                echo "  ✅ $pkg==$version"
+              else
+                echo "  ⚠️ $pkg not found in cache, installing..."
+                pip install "$pkg"
+              fi
+            done
+            
+            echo "✅ All build dependencies verified"
           else
-            echo "No requirements.txt found, installing project in development mode"
-            pip install -e .
+            echo "⚠️ Running in standalone mode (without setup-environment)"
+            echo "Installing build dependencies..."
+            
+            python -m pip install --upgrade pip
+            
+            if [ -f "requirements.txt" ]; then
+              echo "Installing from requirements.txt"
+              pip install -r requirements.txt
+            else
+              echo "No requirements.txt found, installing project in development mode"
+              pip install -e .
+            fi
           fi
 
-      # Step 5: Upload artifacts (optional but recommended)
+      # Step 5: Perform build steps
+      - name: Verify Flask application
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          echo "🔍 Verifying Flask application..."
+          echo "Working directory: $(pwd)"
+          
+          # Check if app package exists
+          if [ -d "app" ] && [ -f "app/__init__.py" ]; then
+            echo "✅ Found app package with __init__.py"
+          else
+            echo "❌ app package not found in $(pwd)"
+            ls -la
+            exit 1
+          fi
+          
+          python3 << 'EOF'
+          import sys
+          
+          try:
+              # Current directory should be flask_app/src/main
+              # app package is inside it
+              print(f"Python path: {sys.path}")
+              
+              from app import create_app
+              
+              # Create app in testing mode
+              app = create_app('testing')
+              print(f"✅ App created: {app.name}")
+              
+              # Test a simple route without running server
+              with app.test_client() as client:
+                  response = client.get('/')
+                  print(f"✅ Route test: HTTP {response.status_code}")
+                  
+                  if response.status_code in [200, 302, 404]:
+                      print("✅ App responds correctly")
+                  else:
+                      print(f"⚠️ Unexpected status: {response.status_code}")
+                      
+          except Exception as e:
+              print(f"❌ App verification failed: {e}")
+              import traceback
+              traceback.print_exc()
+              sys.exit(1)
+          EOF
+          
+          echo "✅ Flask application verified successfully"
+
+      # Step 6: Upload build artifacts
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
           path: |
             ${{ inputs.working-directory }}/
-            ~/.cache/pip/
           retention-days: 7
