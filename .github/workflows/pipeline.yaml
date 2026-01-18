@@ -45,8 +45,6 @@ jobs:
       fail-on-issues: false
       dependencies-installed: ${{ needs.setup-environment.outputs.dependencies-installed }}
       cache-key: ${{ needs.setup-environment.outputs.cache-key }}
-      python-root: ${{ needs.setup-environment.outputs.python-root }}
-      workspace-path: ${{ needs.setup-environment.outputs.workspace-path }}
 
   # PHASE 3: BUILD APPLICATION
   build-app:
@@ -57,8 +55,6 @@ jobs:
       working-directory: "flask_app/src"
       dependencies-installed: ${{ needs.setup-environment.outputs.dependencies-installed }}
       cache-key: ${{ needs.setup-environment.outputs.cache-key }}
-      python-root: ${{ needs.setup-environment.outputs.python-root }}
-      workspace-path: ${{ needs.setup-environment.outputs.workspace-path }}
 
   # PHASE 4: PIPELINE SUMMARY
   pipeline-summary:
