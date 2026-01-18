@@ -42,7 +42,7 @@ jobs:
     with:
       python-version: ${{ needs.setup-environment.outputs.python-version }}
       working-directory: "flask_app/src"
-      fail-on-issues: false
+      fail-on-issues: "false"  # ⬅️ AQUI ESTÁ O ERRO! Mude para string
       dependencies-installed: ${{ needs.setup-environment.outputs.dependencies-installed }}
       cache-key: ${{ needs.setup-environment.outputs.cache-key }}
 
@@ -55,6 +55,8 @@ jobs:
       working-directory: "flask_app/src"
       dependencies-installed: ${{ needs.setup-environment.outputs.dependencies-installed }}
       cache-key: ${{ needs.setup-environment.outputs.cache-key }}
+    env:
+      PYTHONPATH: "${{ github.workspace }}/flask_app/src:${{ github.workspace }}"
 
   # PHASE 4: PIPELINE SUMMARY
   pipeline-summary:
@@ -78,7 +80,7 @@ jobs:
           echo ""
           echo "Cache Status......: ${{ needs.setup-environment.outputs.cache-hit }}"
           echo "Requirements Hash.: ${{ needs.setup-environment.outputs.requirements-hash }}"
-          echo "Deps Installed....: ${{ needs.setup-environment.outputs.dependencies-installed }}"  # ⬅️ Adicione esta linha
+          echo "Deps Installed....: ${{ needs.setup-environment.outputs.dependencies-installed }}"
           echo ""
           
           # Determine overall status
