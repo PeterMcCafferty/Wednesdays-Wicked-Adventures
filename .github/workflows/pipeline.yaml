@@ -24,13 +24,13 @@ jobs:
       extra-packages: "pytest bandit"
 
 # PHASE 1: SMOKE TEST (FAST CHECK - 1–2 minutes)
-smoke-test:
-  uses: ./.github/workflows/smoke-test.yaml
-  needs: [setup-environment]
-  with:
-    python-version: ${{ needs.setup-environment.outputs.python-version }}
-    working-directory: "flask_app/src/main"
-    dependencies-installed: true
+  smoke-test:
+    uses: ./.github/workflows/smoke-test.yaml
+    needs: [setup-environment]
+    with:
+      python-version: ${{ needs.setup-environment.outputs.python-version }}
+      working-directory: "flask_app/src/main"
+      dependencies-installed: true
 
   # PHASE 2: SECURITY SCAN (parallel)
   security-sast:
