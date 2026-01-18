@@ -6,30 +6,48 @@ name: Setup Environment
 
 on:
   workflow_call:
+    # ------------------------------------------------------
+    # MAIN INPUTS (required)
+    # ------------------------------------------------------
     inputs:
-      # ------------------------------------------------------
-      # MAIN INPUTS (required)
-      # ------------------------------------------------------
       python-version:
         description: "Python version to use (e.g., '3.11', '3.12')"
         required: true
         type: string
         default: "3.11"
-      
-      # ------------------------------------------------------
-      # OPTIONAL INPUTS
-      # ------------------------------------------------------
+
       extra-packages:
         description: "Extra packages to install (e.g., 'pytest bandit safety')"
         required: false
         type: string
         default: ""
-      
+
       force-clean-install:
         description: "Force clean install ignoring cache"
         required: false
         type: boolean
         default: false
+
+    outputs:
+      cache-hit:
+        description: "Whether dependency cache was hit"
+        value: ${{ jobs.setup.outputs.cache-hit }}
+
+      cache-key:
+        description: "Cache key for dependencies"
+        value: ${{ jobs.setup.outputs.cache-key }}
+
+      requirements-hash:
+        description: "Hash of requirements.txt"
+        value: ${{ jobs.setup.outputs.requirements-hash }}
+
+      python-version:
+        description: "Python version used"
+        value: ${{ jobs.setup.outputs.python-version }}
+
+      dependencies-installed:
+        description: "Whether dependencies were installed"
+        value: ${{ jobs.setup.outputs.dependencies-installed }}
 
 jobs:
   setup:
