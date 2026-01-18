@@ -49,6 +49,14 @@ on:
         description: "Whether dependencies were installed"
         value: ${{ jobs.setup.outputs.dependencies-installed }}
 
+      python-root:
+        description: "Root directory for Python imports"
+        value: ${{ jobs.setup.outputs.python-root }}
+
+      workspace-path:
+        description: "GitHub workspace path"
+        value: ${{ jobs.setup.outputs.workspace-path }}
+
 jobs:
   setup:
     name: Setup Python Environment
@@ -62,8 +70,10 @@ jobs:
       cache-hit: ${{ steps.cache-deps.outputs.cache-hit }}
       cache-key: ${{ steps.generate-cache-key.outputs.cache-key }}
       dependencies-installed: ${{ steps.install-deps.outputs.deps-installed }}
-      python-version: ${{ inputs.python-version }}  # ADDED: Pass python version
-      requirements-hash: ${{ steps.generate-cache-key.outputs.requirements-hash }} # ADDED: Pass requirements hash
+      python-version: ${{ inputs.python-version }}
+      requirements-hash: ${{ steps.generate-cache-key.outputs.requirements-hash }}
+      python-root: ${{ steps.configure-paths.outputs.python-root }}
+      workspace-path: ${{ steps.configure-paths.outputs.workspace-path }}
     
     steps:
       # ------------------------------------------------------
@@ -81,7 +91,29 @@ jobs:
           python-version: ${{ inputs.python-version }}
       
       # ------------------------------------------------------
-      # Step 3: Generate cache key from requirements.txt
+      # Step 3: Configure Python environment paths
+      # ------------------------------------------------------
+      - name: Configure Python environment paths
+        id: configure-paths
+        run: |
+          echo "🔧 Configuring Python environment paths..."
+          
+          WORKSPACE="${{ github.workspace }}"
+          SRC_DIR="$WORKSPACE/flask_app/src"
+          
+          # Configuring PYTHONPATH for execution
+          echo "PYTHONPATH=$SRC_DIR:$WORKSPACE" >> $GITHUB_ENV
+          
+          # Export as outputs for other workflows
+          echo "python-root=$SRC_DIR" >> $GITHUB_OUTPUT
+          echo "workspace-path=$WORKSPACE" >> $GITHUB_OUTPUT
+          
+          echo "✅ Python paths configured"
+          echo "   PYTHONPATH: $SRC_DIR:$WORKSPACE"
+          echo "   Source dir: $SRC_DIR"
+      
+      # ------------------------------------------------------
+      # Step 4: Generate cache key from requirements.txt
       # ------------------------------------------------------
       - name: Generate cache key
         id: generate-cache-key
@@ -113,7 +145,7 @@ jobs:
           fi
       
       # ------------------------------------------------------
-      # Step 4: Cache Python dependencies
+      # Step 5: Cache Python dependencies
       # ------------------------------------------------------
       - name: Cache Python dependencies
         id: cache-deps
@@ -131,7 +163,7 @@ jobs:
             ${{ runner.os }}-python-${{ inputs.python-version }}-
       
       # ------------------------------------------------------
-      # Step 5: Install dependencies
+      # Step 6: Install dependencies
       # ------------------------------------------------------
       - name: Install dependencies
         id: install-deps
@@ -144,6 +176,7 @@ jobs:
           echo "Cache hit: ${{ steps.cache-deps.outputs.cache-hit }}"
           echo "Force clean: $FORCE_CLEAN"
           echo "Extra packages: $EXTRA_PKGS"
+          echo "PYTHONPATH: $PYTHONPATH"  # ⬅️ Mostra o PYTHONPATH configurado
           
           # Upgrade pip first
           python -m pip install --upgrade pip
@@ -179,7 +212,7 @@ jobs:
           echo "deps-installed=true" >> $GITHUB_OUTPUT
       
       # ------------------------------------------------------
-      # Step 6: Verify installation
+      # Step 7: Verify installation
       # ------------------------------------------------------
       - name: Verify installation
         if: always()
@@ -204,9 +237,10 @@ jobs:
           echo "Cache: ${{ steps.cache-deps.outputs.cache-hit }}"
           echo "Requirements hash: ${{ steps.generate-cache-key.outputs.requirements-hash }}"
           echo "Total packages: $(pip list | wc -l)"
+          echo "PYTHONPATH: $PYTHONPATH"  # ⬅️ Adicione esta linha
           
       # ------------------------------------------------------
-      # Step 7: Upload environment info as artifact
+      # Step 8: Upload environment info as artifact
       # ------------------------------------------------------
       - name: Upload environment info
         if: always()

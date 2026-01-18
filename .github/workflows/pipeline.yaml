@@ -29,9 +29,11 @@ jobs:
     needs: [setup-environment]
     with:
       python-version: ${{ needs.setup-environment.outputs.python-version }}
-      working-directory: "flask_app/src/main"
-      dependencies-installed: true
+      working-directory: "flask_app/src"
+      dependencies-installed: ${{ needs.setup-environment.outputs.dependencies-installed }}
       cache-key: ${{ needs.setup-environment.outputs.cache-key }}
+      python-root: ${{ needs.setup-environment.outputs.python-root }}
+      workspace-path: ${{ needs.setup-environment.outputs.workspace-path }}
 
   # PHASE 2: SECURITY SCAN (parallel)
   security-sast:
@@ -40,9 +42,11 @@ jobs:
     with:
       python-version: ${{ needs.setup-environment.outputs.python-version }}
       working-directory: "flask_app/src"
-      fail-on-issues: false  # For testing, we won't fail
-      dependencies-installed: true  # Indicates dependencies are already installed
+      fail-on-issues: false
+      dependencies-installed: ${{ needs.setup-environment.outputs.dependencies-installed }}
       cache-key: ${{ needs.setup-environment.outputs.cache-key }}
+      python-root: ${{ needs.setup-environment.outputs.python-root }}
+      workspace-path: ${{ needs.setup-environment.outputs.workspace-path }}
 
   # PHASE 3: BUILD APPLICATION
   build-app:
@@ -51,8 +55,10 @@ jobs:
     with:
       python-version: ${{ needs.setup-environment.outputs.python-version }}
       working-directory: "flask_app/src"
-      dependencies-installed: true  # Indicates dependencies are already installed
+      dependencies-installed: ${{ needs.setup-environment.outputs.dependencies-installed }}
       cache-key: ${{ needs.setup-environment.outputs.cache-key }}
+      python-root: ${{ needs.setup-environment.outputs.python-root }}
+      workspace-path: ${{ needs.setup-environment.outputs.workspace-path }}
 
   # PHASE 4: PIPELINE SUMMARY
   pipeline-summary:
@@ -76,6 +82,7 @@ jobs:
           echo ""
           echo "Cache Status......: ${{ needs.setup-environment.outputs.cache-hit }}"
           echo "Requirements Hash.: ${{ needs.setup-environment.outputs.requirements-hash }}"
+          echo "Deps Installed....: ${{ needs.setup-environment.outputs.dependencies-installed }}"  # ⬅️ Adicione esta linha
           echo ""
           
           # Determine overall status
