@@ -48,7 +48,7 @@ jobs:
   # PHASE 3: BUILD APPLICATION
   build-app:
     uses: ./.github/workflows/build-app.yaml
-    needs: [smoke-test, security-sast]
+    needs: [setup-environment, smoke-test, security-sast]
     with:
       python-version: ${{ needs.setup-environment.outputs.python-version }}
       working-directory: "flask_app/src"

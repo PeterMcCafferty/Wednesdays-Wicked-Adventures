@@ -41,7 +41,25 @@ jobs:
         with:
           python-version: ${{ inputs.python-version }}
       
+      # Before checking cache, verify setup-environment was executed
+      - name: Verify setup-environment was executed
+        if: ${{ !inputs.dependencies-installed || inputs.cache-key == '' || inputs.requirements-hash == '' }}
+        run: |
+          echo "❌ ERROR: This workflow requires setup-environment to run first"
+          echo "Current inputs:"
+          echo "  - dependencies-installed: ${{ inputs.dependencies-installed }}"
+          echo "  - cache-key: '${{ inputs.cache-key }}'"
+          echo "  - requirements-hash: '${{ inputs.requirements-hash }}'"
+          echo ""
+          echo "Please run smoke-test via pipeline.yaml with:"
+          echo "  - dependencies-installed: true"
+          echo "  - cache-key: \${{ needs.setup-environment.outputs.cache-key }}"
+          echo "  - requirements-hash: \${{ needs.setup-environment.outputs.requirements-hash }}"
+          exit 1
+
+      # CACHE with if condition
       - name: Restore Python dependencies cache
+        if: ${{ inputs.dependencies-installed && inputs.cache-key != '' }}
         uses: actions/cache@v4
         with:
           path: |
@@ -51,16 +69,49 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-python-${{ inputs.python-version }}-deps-
       
-      - name: Verify setup-environment was executed
-        if: ${{ !inputs.dependencies-installed || inputs.cache-key == '' || inputs.requirements-hash == '' }}
+      # INTELIGENCE FALLBACK - Just if is necessary
+      - name: Verify or install dependencies if cache failed
+        if: ${{ inputs.dependencies-installed && inputs.cache-key == '' }}
         run: |
-          echo "❌ ERROR: This workflow requires setup-environment to run first"
-          echo "Please run smoke-test via pipeline.yaml with:"
-          echo "  - dependencies-installed: true"
-          echo "  - cache-key: \${{ needs.setup-environment.outputs.cache-key }}"
-          echo "  - requirements-hash: \${{ needs.setup-environment.outputs.requirements-hash }}"
-          exit 1
+          echo "🔍 Cache key is empty but dependencies-installed is true."
+          echo "Checking if dependencies are already installed from setup-environment..."
+          
+          # Verifica se alguns pacotes essenciais estão instalados
+          ESSENTIAL_PKGS="Flask flask-sqlalchemy pymysql flask-login"
+          MISSING_ESSENTIAL=0
+          
+          for pkg in $ESSENTIAL_PKGS; do
+            if pip show "$pkg" >/dev/null 2>&1; then
+              version=$(pip show "$pkg" | grep "^Version:" | cut -d: -f2 | xargs)
+              echo "✅ $pkg==$version (already installed)"
+            else
+              echo "❌ $pkg - NOT FOUND"
+              MISSING_ESSENTIAL=$((MISSING_ESSENTIAL + 1))
+            fi
+          done
+          
+          if [ $MISSING_ESSENTIAL -eq 0 ]; then
+            echo "✅ All essential packages already installed."
+            echo "Proceeding with smoke tests..."
+          else
+            echo "⚠️ Some essential packages missing ($MISSING_ESSENTIAL)."
+            echo "Installing dependencies from requirements.txt as fallback..."
+            
+            python -m pip install --upgrade pip
+            
+            REQ_FILE="flask_app/src/requirements.txt"
+            if [ -f "$REQ_FILE" ]; then
+              echo "Installing from requirements.txt"
+              pip install -r "$REQ_FILE"
+            else
+              echo "❌ ERROR: requirements.txt not found at $REQ_FILE"
+              exit 1
+            fi
+            
+            echo "✅ Dependencies installed via fallback"
+          fi
       
+      # All packages verification
       - name: Verify ALL requirements.txt packages are installed
         run: |
           echo "🔍 Verifying ALL packages from requirements.txt via setup-environment..."
