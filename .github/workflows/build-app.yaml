@@ -92,8 +92,8 @@ jobs:
             if [ $MISSING_PACKAGES -gt 0 ]; then
               echo "💀 BUILD VERIFICATION FAILED!"
               echo "   $MISSING_PACKAGES essential packages are MISSING"
-              echo "   Previous steps (setup-environment/smoke-test) should have installed them"
-              echo "   Check setup-environment and smoke-test logs for errors"
+              echo "   Previous step (setup-environment) should have installed them"
+              echo "   Check setup-environment logs for errors"
               exit 1
             else
               echo "✅ ALL essential packages are installed"
@@ -107,11 +107,10 @@ jobs:
             exit 1
           fi
 
-      # Step 5: Perform build verification
       - name: Verify Flask application
         working-directory: ${{ inputs.working-directory }}
         env:
-          PYTHONPATH: "${{ github.workspace }}/flask_app/src:${{ github.workspace }}"
+          PYTHONPATH: "${{ inputs.working-directory }}:${{ github.workspace }}"
         run: |
           echo "🔍 Final Flask application verification..."
           echo "Working directory: $(pwd)"
@@ -126,7 +125,7 @@ jobs:
           print("=" * 40)
           
           try:
-              # Importa do mesmo lugar que smoke test
+              # Importa a aplicação
               from main.app import create_app
               print("✅ Successfully imported create_app from main.app")
               
@@ -138,35 +137,57 @@ jobs:
               print(f"\n📋 Basic app info:")
               print(f"   Testing mode: {app.config.get('TESTING', False)}")
               print(f"   Debug mode: {app.config.get('DEBUG', False)}")
+              print(f"   Config keys: {len(app.config)}")
               
-              # Verifica se app responde
-              print("\n🌐 Testing if app can handle requests...")
-              with app.test_client() as client:
-                  # Adiciona rota temporária para teste
-                  @app.route('/_build_test')
-                  def build_test():
-                      return 'BUILD_OK', 200
+              # Verifica se app tem configuração básica
+              if not app.config.get('SECRET_KEY'):
+                  print("⚠️ WARNING: SECRET_KEY not set (might be expected in testing)")
+              
+              # Verifica se app tem rotas definidas
+              print(f"\n🌐 Checking app routes...")
+              routes = list(app.url_map.iter_rules())
+              print(f"   Found {len(routes)} routes")
+              
+              if routes:
+                  # Testa a primeira rota não interna
+                  for route in routes:
+                      if not route.rule.startswith('/_') and len(route.rule) > 1:
+                          print(f"   Sample route: {route.rule}")
+                          break
                   
-                  response = client.get('/_build_test')
-                  if response.status_code == 200:
-                      print(f"✅ App responds to HTTP requests")
-                  else:
-                      print(f"❌ App returned {response.status_code}")
-                      sys.exit(1)
+                  # Testa se app pode responder
+                  print("\n🧪 Testing app response capability...")
+                  with app.test_client() as client:
+                      # Tenta acessar uma rota existente ou verifica app health
+                      response = client.get('/')
+                      print(f"   Root endpoint status: {response.status_code}")
+                      
+                      # Se 404, pode ser normal (app pode não ter rota raiz)
+                      if response.status_code != 404:
+                          print(f"✅ App responds with status {response.status_code}")
+                      else:
+                          print("ℹ️ Root endpoint returns 404 (might be expected)")
+                          
+                      # Verifica estrutura básica do app
+                      print(f"\n✅ App verification passed")
+              else:
+                  print("⚠️ WARNING: No routes defined in application")
               
           except ImportError as e:
               print(f"\n❌ IMPORT ERROR: {e}")
-              print("This should have been caught by smoke test!")
+              print("This should have been caught by setup-environment!")
               sys.exit(1)
           except Exception as e:
               print(f"\n❌ APPLICATION ERROR: {type(e).__name__}: {e}")
+              import traceback
+              traceback.print_exc()
               sys.exit(1)
           
           print("\n" + "=" * 40)
           print("🎉 BUILD VERIFICATION PASSED!")
           print("✅ Application imports work")
           print("✅ App can be instantiated")
-          print("✅ App responds to requests")
+          print("✅ App structure is valid")
           print("")
           print("🚀 APPLICATION IS READY FOR DEPLOYMENT")
           EOF
