@@ -17,6 +17,9 @@ on:
       dependencies-installed:
         required: true
         type: boolean
+      cache-key:
+        required: true
+        type: string
 
 jobs:
   smoke:
@@ -24,13 +27,20 @@ jobs:
     timeout-minutes: 3
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ inputs.python-version }}
+
+      # Restaurar cache de dependências do setup
+      - name: Restore Python dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            /opt/hostedtoolcache/Python
+          key: ${{ inputs.cache-key }}
 
       - name: Validate environment precondition
         if: ${{ !inputs.dependencies-installed }}
