@@ -1,0 +1,200 @@
+# ============================================================
+# SETUP ENVIRONMENT WORKFLOW - OPTIMIZED FOR YOUR PROJECT
+# ============================================================
+
+name: Setup Environment
+
+on:
+  workflow_call:
+    inputs:
+      # ------------------------------------------------------
+      # MAIN INPUTS (required)
+      # ------------------------------------------------------
+      python-version:
+        description: "Python version to use (e.g., '3.11', '3.12')"
+        required: true
+        type: string
+        default: "3.11"
+      
+      # ------------------------------------------------------
+      # OPTIONAL INPUTS
+      # ------------------------------------------------------
+      extra-packages:
+        description: "Extra packages to install (e.g., 'pytest bandit safety')"
+        required: false
+        type: string
+        default: ""
+      
+      force-clean-install:
+        description: "Force clean install ignoring cache"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  setup:
+    name: Setup Python Environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    
+    # ------------------------------------------------------
+    # OUTPUTS AVAILABLE TO OTHER WORKFLOWS
+    # ------------------------------------------------------
+    outputs:
+      cache-hit: ${{ steps.cache-deps.outputs.cache-hit }}
+      cache-key: ${{ steps.generate-cache-key.outputs.cache-key }}
+      dependencies-installed: ${{ steps.install-deps.outputs.deps-installed }}
+      requirements-hash: ${{ steps.generate-cache-key.outputs.req-hash }}
+    
+    steps:
+      # ------------------------------------------------------
+      # Step 1: Checkout repository
+      # ------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # ------------------------------------------------------
+      # Step 2: Set up Python
+      # ------------------------------------------------------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+      
+      # ------------------------------------------------------
+      # Step 3: Generate cache key from requirements.txt
+      # ------------------------------------------------------
+      - name: Generate cache key
+        id: generate-cache-key
+        run: |
+          echo "🔑 Generating cache key..."
+          
+          # Define the exact path to requirements.txt
+          REQ_FILE="flask_app/src/requirements.txt"
+          
+          if [ -f "$REQ_FILE" ]; then
+            echo "✅ Found requirements.txt at: $REQ_FILE"
+            
+            # Generate hash from the requirements file
+            REQ_HASH=$(sha256sum "$REQ_FILE" | cut -d' ' -f1 | head -c 12)
+            
+            # Build cache key
+            CACHE_KEY="${{ runner.os }}-python-${{ inputs.python-version }}-deps-${REQ_HASH}"
+            
+            echo "Requirements hash: ${REQ_HASH}"
+            echo "Cache key: ${CACHE_KEY}"
+            
+            echo "cache-key=${CACHE_KEY}" >> $GITHUB_OUTPUT
+            echo "req-hash=${REQ_HASH}" >> $GITHUB_OUTPUT
+            echo "req-file=${REQ_FILE}" >> $GITHUB_OUTPUT
+          else
+            echo "❌ ERROR: requirements.txt not found at $REQ_FILE"
+            echo "Please check the path: flask_app/src/requirements.txt"
+            exit 1
+          fi
+      
+      # ------------------------------------------------------
+      # Step 4: Cache Python dependencies
+      # ------------------------------------------------------
+      - name: Cache Python dependencies
+        id: cache-deps
+        uses: actions/cache@v3
+        with:
+          # What to cache
+          path: |
+            ~/.cache/pip
+            /opt/hostedtoolcache/Python
+          # Cache key based on requirements.txt hash
+          key: ${{ steps.generate-cache-key.outputs.cache-key }}
+          # Fallback keys if exact match not found
+          restore-keys: |
+            ${{ runner.os }}-python-${{ inputs.python-version }}-deps-
+            ${{ runner.os }}-python-${{ inputs.python-version }}-
+      
+      # ------------------------------------------------------
+      # Step 5: Install dependencies
+      # ------------------------------------------------------
+      - name: Install dependencies
+        id: install-deps
+        env:
+          FORCE_CLEAN: ${{ inputs.force-clean-install }}
+          EXTRA_PKGS: ${{ inputs.extra-packages }}
+        run: |
+          echo "📦 INSTALLING DEPENDENCIES"
+          echo "=========================="
+          echo "Cache hit: ${{ steps.cache-deps.outputs.cache-hit }}"
+          echo "Force clean: $FORCE_CLEAN"
+          echo "Extra packages: $EXTRA_PKGS"
+          
+          # Upgrade pip first
+          python -m pip install --upgrade pip
+          
+          # Check if we should skip installation
+          if [ "${{ steps.cache-deps.outputs.cache-hit }}" == 'true' ] && [ "$FORCE_CLEAN" == 'false' ]; then
+            echo "✅ Cache hit - Dependencies already installed"
+            echo "Verifying installation without downloading..."
+            
+            # Quick verification (no network)
+            pip install -r flask_app/src/requirements.txt --no-deps --quiet || {
+              echo "⚠️ Quick verification failed, installing properly..."
+              pip install -r flask_app/src/requirements.txt
+            }
+            
+            echo "deps-installed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Fresh installation (cache miss or forced)
+          echo "🔄 Installing dependencies from requirements.txt..."
+          
+          # Install main requirements
+          pip install -r flask_app/src/requirements.txt
+          
+          # Install extra packages if specified
+          if [ -n "$EXTRA_PKGS" ]; then
+            echo "Installing extra packages: $EXTRA_PKGS"
+            pip install $EXTRA_PKGS
+          fi
+          
+          echo "✅ All dependencies installed successfully"
+          echo "deps-installed=true" >> $GITHUB_OUTPUT
+      
+      # ------------------------------------------------------
+      # Step 6: Verify installation
+      # ------------------------------------------------------
+      - name: Verify installation
+        if: always()
+        run: |
+          echo "🔍 VERIFICATION REPORT"
+          echo "======================"
+          
+          # Check critical packages for Flask app
+          echo "Checking critical packages:"
+          for pkg in Flask flask-sqlalchemy pymysql flask-login; do
+            if pip show "$pkg" > /dev/null 2>&1; then
+              VERSION=$(pip show "$pkg" | grep Version | cut -d' ' -f2)
+              echo "  ✅ $pkg==$VERSION"
+            else
+              echo "  ❌ $pkg not installed"
+            fi
+          done
+          
+          # Summary
+          echo ""
+          echo "📊 INSTALLATION SUMMARY:"
+          echo "Cache: ${{ steps.cache-deps.outputs.cache-hit }}"
+          echo "Requirements hash: ${{ steps.generate-cache-key.outputs.req-hash }}"
+          echo "Total packages: $(pip list | wc -l)"
+          
+      # ------------------------------------------------------
+      # Step 7: Upload environment info as artifact
+      # ------------------------------------------------------
+      - name: Upload environment info
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: environment-info
+          path: |
+            ~/.cache/pip/
+            /opt/hostedtoolcache/Python/
+          retention-days: 7
