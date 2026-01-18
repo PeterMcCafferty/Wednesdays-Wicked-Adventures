@@ -1,5 +1,5 @@
 # ============================================================
-# SAST SECURITY SCAN WORKFLOW (SIMPLIFIED)
+# SAST SECURITY SCAN WORKFLOW
 # ============================================================
 name: SAST Security Scan
 
@@ -21,6 +21,16 @@ on:
         required: true
         type: boolean
         default: true
+      dependencies-installed:
+        description: "Indicates if dependencies are already installed from setup-environment"
+        required: false
+        type: boolean
+        default: false
+      cache-key:
+        description: "Cache key from setup-environment for dependency cache"
+        required: false
+        type: string
+        default: ""
       config-path:
         description: "Path to Bandit config file"
         required: false
@@ -43,21 +53,39 @@ jobs:
         with:
           python-version: ${{ inputs.python-version }}
       
-      # 3. Cache pip dependencies
-      - name: Cache pip dependencies
-        id: cache-security-pip
-        uses: actions/cache@v3
+      # 3. Restore Python dependencies cache
+      - name: Restore Python dependencies cache
+        if: ${{ inputs.dependencies-installed && inputs.cache-key != '' }}
+        uses: actions/cache@v4
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-security-pip-bandit-${{ hashFiles('**/requirements*.txt') }}
+          path: |
+            ~/.cache/pip
+            /opt/hostedtoolcache/Python
+          key: ${{ inputs.cache-key }}
           restore-keys: |
-            ${{ runner.os }}-security-pip-
+            ${{ runner.os }}-python-${{ inputs.python-version }}-deps-
       
-      # 4. Install Bandit
-      - name: Install Bandit
+      # 4. Verify dependencies or install Bandit
+      - name: Install Bandit (or verify dependencies)
         run: |
-          python -m pip install --upgrade pip
-          pip install bandit
+          if [ "${{ inputs.dependencies-installed }}" = "true" ] && [ -n "${{ inputs.cache-key }}" ]; then
+            echo "✅ Using dependencies from setup-environment"
+            echo "Checking if bandit is available..."
+            
+            if pip show bandit >/dev/null 2>&1; then
+              echo "✅ Bandit already installed via setup-environment"
+              bandit_version=$(pip show bandit | grep "^Version:" | cut -d: -f2 | xargs)
+              echo "   Bandit version: $bandit_version"
+            else
+              echo "⚠️ Bandit not found in cache, installing..."
+              pip install bandit
+            fi
+          else
+            echo "⚠️ Running in standalone mode (without setup-environment)"
+            echo "Installing Bandit and dependencies..."
+            python -m pip install --upgrade pip
+            pip install bandit
+          fi
       
       # 5. Run Bandit Scan
       - name: Run Bandit Security Scan
@@ -67,7 +95,7 @@ jobs:
         run: |
           # Check config file
           if [ ! -f "${{ inputs.config-path }}" ]; then
-            echo "ℹ️  Using default Bandit settings"
+            echo "ℹ️ Using default Bandit settings"
             CONFIG_ARG=""
           else
             CONFIG_ARG="-c ${{ inputs.config-path }}"
@@ -75,6 +103,8 @@ jobs:
           
           # Run Bandit with exit code control
           echo "🔍 Running Bandit security scan..."
+          echo "Using dependencies from: ${{ inputs.dependencies-installed && 'setup-environment' || 'standalone installation' }}"
+          
           bandit $CONFIG_ARG -r . -f json -o bandit-results.json
           
           # Check if results file was created
@@ -92,13 +122,13 @@ jobs:
             echo "   LOW severity: $LOW"
             
             if [ "$HIGH" -gt 0 ] || [ "$MEDIUM" -gt 0 ]; then
-              echo "⚠️  Found $HIGH HIGH and $MEDIUM MEDIUM severity issues"
+              echo "⚠️ Found $HIGH HIGH and $MEDIUM MEDIUM severity issues"
               
               if [ "${{ inputs.fail-on-issues }}" = "true" ]; then
                 echo "❌ Failing pipeline due to security issues"
                 exit 1
               else
-                echo "⚠️  Continuing pipeline (fail-on-issues is false)"
+                echo "⚠️ Continuing pipeline (fail-on-issues is false)"
               fi
             else
               echo "✅ No HIGH or MEDIUM severity issues found"

@@ -28,37 +28,42 @@ jobs:
     uses: ./.github/workflows/smoke-test.yaml
     needs: setup-environment
     with:
-      python-version: "3.11"
+      python-version: ${{ needs.setup-environment.outputs.python-version }}
       working-directory: "flask_app/src/main"
       dependencies-installed: true  # Indicates dependencies are already installed
+      cache-key: ${{ needs.setup-environment.outputs.cache-key }}
+      requirements-hash: ${{ needs.setup-environment.outputs.requirements-hash }}
 
   # PHASE 2: SECURITY SCAN (parallel)
   security-sast:
     uses: ./.github/workflows/sast.yaml
-    needs: setup-environment  # Now depends on setup
+    needs: setup-environment
     with:
-      python-version: "3.11"
+      python-version: ${{ needs.setup-environment.outputs.python-version }}
       working-directory: "flask_app/src"
       fail-on-issues: false  # For testing, we won't fail
       dependencies-installed: true  # Indicates dependencies are already installed
+      cache-key: ${{ needs.setup-environment.outputs.cache-key }}
 
   # PHASE 3: BUILD APPLICATION
   build-app:
     uses: ./.github/workflows/build-app.yaml
-    needs: [smoke-test, security-sast]  # Maintains logical dependency
+    needs: [smoke-test, security-sast]
     with:
-      python-version: "3.11"
+      python-version: ${{ needs.setup-environment.outputs.python-version }}
       working-directory: "flask_app/src"
       dependencies-installed: true  # Indicates dependencies are already installed
+      cache-key: ${{ needs.setup-environment.outputs.cache-key }}
 
   # PHASE 4: TEST REAL APPLICATION
   test-app:
     uses: ./.github/workflows/test-app.yaml
     needs: [build-app]
     with:
-      python-version: "3.11"
+      python-version: ${{ needs.setup-environment.outputs.python-version }}
       working-directory: "flask_app/src"
       dependencies-installed: true  # Indicates dependencies are already installed
+      cache-key: ${{ needs.setup-environment.outputs.cache-key }}
 
   # PHASE 5: PIPELINE SUMMARY
   pipeline-summary:
@@ -80,6 +85,9 @@ jobs:
           echo "Security Scan.....: ${{ needs.security-sast.result }}"
           echo "Build.............: ${{ needs.build-app.result }}"
           echo "Tests.............: ${{ needs.test-app.result }}"
+          echo ""
+          echo "Cache Status......: ${{ needs.setup-environment.outputs.cache-hit }}"
+          echo "Requirements Hash.: ${{ needs.setup-environment.outputs.requirements-hash }}"
           echo ""
           
           # Determine overall status

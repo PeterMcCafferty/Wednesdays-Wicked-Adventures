@@ -1,5 +1,5 @@
 # ============================================================
-# SETUP ENVIRONMENT WORKFLOW - OPTIMIZED FOR YOUR PROJECT
+# SETUP ENVIRONMENT WORKFLOW
 # ============================================================
 
 name: Setup Environment
@@ -44,6 +44,7 @@ jobs:
       cache-hit: ${{ steps.cache-deps.outputs.cache-hit }}
       cache-key: ${{ steps.generate-cache-key.outputs.cache-key }}
       dependencies-installed: ${{ steps.install-deps.outputs.deps-installed }}
+      python-version: ${{ inputs.python-version }}  # ADDED: Pass python version
       requirements-hash: ${{ steps.generate-cache-key.outputs.req-hash }}
     
     steps:
