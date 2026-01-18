@@ -45,7 +45,7 @@ jobs:
       cache-key: ${{ steps.generate-cache-key.outputs.cache-key }}
       dependencies-installed: ${{ steps.install-deps.outputs.deps-installed }}
       python-version: ${{ inputs.python-version }}  # ADDED: Pass python version
-      requirements-hash: ${{ steps.generate-cache-key.outputs.req-hash }}
+      requirements-hash: ${{ steps.generate-cache-key.outputs.requirements-hash }} # ADDED: Pass requirements hash
     
     steps:
       # ------------------------------------------------------
@@ -86,7 +86,7 @@ jobs:
             echo "Cache key: ${CACHE_KEY}"
             
             echo "cache-key=${CACHE_KEY}" >> $GITHUB_OUTPUT
-            echo "req-hash=${REQ_HASH}" >> $GITHUB_OUTPUT
+            echo "requirements-hash=${REQ_HASH}" >> $GITHUB_OUTPUT
             echo "req-file=${REQ_FILE}" >> $GITHUB_OUTPUT
           else
             echo "❌ ERROR: requirements.txt not found at $REQ_FILE"
@@ -99,7 +99,7 @@ jobs:
       # ------------------------------------------------------
       - name: Cache Python dependencies
         id: cache-deps
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           # What to cache
           path: |
@@ -184,7 +184,7 @@ jobs:
           echo ""
           echo "📊 INSTALLATION SUMMARY:"
           echo "Cache: ${{ steps.cache-deps.outputs.cache-hit }}"
-          echo "Requirements hash: ${{ steps.generate-cache-key.outputs.req-hash }}"
+          echo "Requirements hash: ${{ steps.generate-cache-key.outputs.requirements-hash }}"
           echo "Total packages: $(pip list | wc -l)"
           
       # ------------------------------------------------------
