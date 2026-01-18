@@ -30,9 +30,8 @@ jobs:
     with:
       python-version: ${{ needs.setup-environment.outputs.python-version }}
       working-directory: "flask_app/src/main"
-      dependencies-installed: true  # Indicates dependencies are already installed
+      dependencies-installed: true
       cache-key: ${{ needs.setup-environment.outputs.cache-key }}
-      requirements-hash: ${{ needs.setup-environment.outputs.requirements-hash }}
 
   # PHASE 2: SECURITY SCAN (parallel)
   security-sast:
