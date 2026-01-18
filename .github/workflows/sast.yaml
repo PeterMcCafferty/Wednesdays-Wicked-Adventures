@@ -19,13 +19,13 @@ on:
       fail-on-issues:
         description: "Fail the pipeline if high/medium issues found"
         required: true
-        type: boolean
-        default: true
+        type: string
+        default: "true"
       dependencies-installed:
         description: "Indicates if dependencies are already installed from setup-environment"
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: "false"
       cache-key:
         description: "Cache key from setup-environment for dependency cache"
         required: false
@@ -55,7 +55,7 @@ jobs:
       
       # 3. Restore Python dependencies cache
       - name: Restore Python dependencies cache
-        if: ${{ inputs.dependencies-installed && inputs.cache-key != '' }}
+        if: ${{ inputs.dependencies-installed == 'true' && inputs.cache-key != '' }}  # ⬅️ Compare como string
         uses: actions/cache@v4
         with:
           path: |
@@ -90,7 +90,7 @@ jobs:
       # 5. Run Bandit Scan
       - name: Run Bandit Security Scan
         id: bandit-scan
-        continue-on-error: ${{ !inputs.fail-on-issues }}
+        continue-on-error: ${{ inputs.fail-on-issues != 'true' }}  # ⬅️ Compare como string
         run: |
           # Navigate to the correct directory
           cd "${{ inputs.working-directory }}"
@@ -106,7 +106,7 @@ jobs:
           
           # Run Bandit with exit code control
           echo "🔍 Running Bandit security scan..."
-          echo "Using dependencies from: ${{ inputs.dependencies-installed && 'setup-environment' || 'standalone installation' }}"
+          echo "Using dependencies from: ${{ inputs.dependencies-installed == 'true' && 'setup-environment' || 'standalone installation' }}"
           
           bandit $CONFIG_ARG -r . -f json -o bandit-results.json
           
@@ -127,7 +127,7 @@ jobs:
             if [ "$HIGH" -gt 0 ] || [ "$MEDIUM" -gt 0 ]; then
               echo "⚠️ Found $HIGH HIGH and $MEDIUM MEDIUM severity issues"
               
-              if [ "${{ inputs.fail-on-issues }}" = "true" ]; then
+              if [ "${{ inputs.fail-on-issues }}" = "true" ]; then  # ⬅️ Já está correto
                 echo "❌ Failing pipeline due to security issues"
                 exit 1
               else

@@ -21,8 +21,8 @@ on:
       dependencies-installed:
         description: "Indicates if dependencies are already installed from setup-environment"
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: "false"
       cache-key:
         description: "Cache key from setup-environment for dependency cache"
         required: false
@@ -48,7 +48,7 @@ jobs:
 
       # Step 3: Restore Python dependencies cache
       - name: Restore Python dependencies cache
-        if: ${{ inputs.dependencies-installed && inputs.cache-key != '' }}
+        if: ${{ inputs.dependencies-installed == 'true' && inputs.cache-key != '' }}
         uses: actions/cache@v4
         with:
           path: |
@@ -69,7 +69,7 @@ jobs:
           echo ""
           
           # CRITICAL: Se dependencies-installed é true, DEVE ter tudo instalado
-          if [ "${{ inputs.dependencies-installed }}" = "true" ]; then
+          if [ "${{ inputs.dependencies-installed }}" = "true" ]; then  # ⬅️ Já está correto
             echo "✅ setup-environment executed successfully"
             echo "Checking if ALL required packages are installed..."
             
@@ -101,7 +101,7 @@ jobs:
             fi
           
           else
-            echo "⚠️ dependencies-installed is false"
+            echo "⚠️ dependencies-installed is ${{ inputs.dependencies-installed }}"
             echo "This build job requires setup-environment to run first"
             echo "Please run via pipeline.yaml with dependencies-installed: true"
             exit 1

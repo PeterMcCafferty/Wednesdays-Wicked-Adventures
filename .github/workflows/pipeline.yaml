@@ -22,6 +22,7 @@ jobs:
       python-version: "3.11"
       # Install extra packages needed by all workflows
       extra-packages: "pytest bandit"
+      force-clean-install: "false" 
 
   # PHASE 1: SMOKE TEST (FAST CHECK - 2-3 minutes)
   smoke-test:
@@ -42,7 +43,7 @@ jobs:
     with:
       python-version: ${{ needs.setup-environment.outputs.python-version }}
       working-directory: "flask_app/src"
-      fail-on-issues: ${{ false }} 
+      fail-on-issues: "false"  
       dependencies-installed: ${{ needs.setup-environment.outputs.dependencies-installed }}
       cache-key: ${{ needs.setup-environment.outputs.cache-key }}
 

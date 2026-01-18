@@ -25,8 +25,8 @@ on:
       force-clean-install:
         description: "Force clean install ignoring cache"
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: "false"
 
     outputs:
       cache-hit:
