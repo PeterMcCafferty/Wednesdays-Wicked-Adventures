@@ -15,41 +15,55 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # FASE 0: SMOKE TEST (FAST CHECK - 2-3 minutos)
+  # PHASE 0: SETUP ENVIRONMENT (INSTALL DEPENDENCIES ONCE)
+  setup-environment:
+    uses: ./.github/workflows/setup-environment.yaml
+    with:
+      python-version: "3.11"
+      # Install extra packages needed by all workflows
+      extra-packages: "pytest bandit"
+
+  # PHASE 1: SMOKE TEST (FAST CHECK - 2-3 minutes)
   smoke-test:
     uses: ./.github/workflows/smoke-test.yaml
+    needs: setup-environment
     with:
       python-version: "3.11"
       working-directory: "flask_app/src/main"
+      dependencies-installed: true  # Indicates dependencies are already installed
 
-  # FASE 1: SECURITY SCAN (em paralelo)
+  # PHASE 2: SECURITY SCAN (parallel)
   security-sast:
     uses: ./.github/workflows/sast.yaml
+    needs: setup-environment  # Now depends on setup
     with:
       python-version: "3.11"
       working-directory: "flask_app/src"
       fail-on-issues: false  # For testing, we won't fail
+      dependencies-installed: true  # Indicates dependencies are already installed
 
-  # FASE 2: BUILD APPLICATION
+  # PHASE 3: BUILD APPLICATION
   build-app:
     uses: ./.github/workflows/build-app.yaml
-    needs: [smoke-test, security-sast]  
+    needs: [smoke-test, security-sast]  # Maintains logical dependency
     with:
       python-version: "3.11"
       working-directory: "flask_app/src"
+      dependencies-installed: true  # Indicates dependencies are already installed
 
-  # FASE 3: TEST REAL APPLICATION
+  # PHASE 4: TEST REAL APPLICATION
   test-app:
     uses: ./.github/workflows/test-app.yaml
     needs: [build-app]
     with:
       python-version: "3.11"
       working-directory: "flask_app/src"
+      dependencies-installed: true  # Indicates dependencies are already installed
 
-  # FASE 4: PIPELINE SUMMARY
+  # PHASE 5: PIPELINE SUMMARY
   pipeline-summary:
     runs-on: ubuntu-latest
-    needs: [smoke-test, security-sast, build-app, test-app] 
+    needs: [setup-environment, smoke-test, security-sast, build-app, test-app]
     if: always()
     timeout-minutes: 2
     
@@ -61,10 +75,11 @@ jobs:
           echo ""
           echo "Job Results:"
           echo "------------"
-          echo "Smoke Test......: ${{ needs.smoke-test.result }}"
-          echo "Security Scan...: ${{ needs.security-sast.result }}"
-          echo "Build...........: ${{ needs.build-app.result }}"
-          echo "Tests...........: ${{ needs.test-app.result }}"
+          echo "Setup Environment.: ${{ needs.setup-environment.result }}"
+          echo "Smoke Test........: ${{ needs.smoke-test.result }}"
+          echo "Security Scan.....: ${{ needs.security-sast.result }}"
+          echo "Build.............: ${{ needs.build-app.result }}"
+          echo "Tests.............: ${{ needs.test-app.result }}"
           echo ""
           
           # Determine overall status
