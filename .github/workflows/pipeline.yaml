@@ -26,7 +26,7 @@ jobs:
   # PHASE 1: SMOKE TEST (FAST CHECK - 2-3 minutes)
   smoke-test:
     uses: ./.github/workflows/smoke-test.yaml
-    needs: setup-environment
+    needs: [setup-environment]
     with:
       python-version: ${{ needs.setup-environment.outputs.python-version }}
       working-directory: "flask_app/src/main"
