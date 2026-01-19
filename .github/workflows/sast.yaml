@@ -28,6 +28,14 @@ on:
         required: false
         type: string
         default: ".bandit.yml"
+      requirements-hash:
+        description: "Hash of requirements.txt for cache key"
+        required: true
+        type: string
+      python-version:
+        description: "Python version for cache key"
+        required: true
+        type: string
 
 jobs:
   bandit-scan:
@@ -42,8 +50,28 @@ jobs:
       # 1. Checkout
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # 2. RESTAURAR CACHE DO VENV
+      - name: Restore virtual environment cache
+        id: restore-venv-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ inputs.venv-path }}
+          key: venv-${{ runner.os }}-python-${{ inputs.python-version }}-deps-${{ inputs.requirements-hash }}
+          restore-keys: |
+            venv-${{ runner.os }}-python-${{ inputs.python-version }}-deps-
+
+      # 2.5. DEBUG: Verificar cache
+      - name: Debug cache status
+        run: |
+          echo "🧪 Cache restore result:"
+          echo "Cache hit: ${{ steps.restore-venv-cache.outputs.cache-hit }}"
+          echo "Expected venv path: $VENV_PATH"
+          echo "Venv exists? $( [ -d "$VENV_PATH" ] && echo "YES" || echo "NO" )"
+          echo "Listing directory:"
+          ls -la "$(dirname "$VENV_PATH")" || true
       
-      # 2. VERIFICAR VENV
+      # 3. VERIFICAR VENV
       - name: Verify virtual environment
         run: |
           echo "🔍 Verifying virtual environment..."
@@ -63,7 +91,7 @@ jobs:
           echo "   Python: $VENV_PYTHON"
           echo "   Version: $($VENV_PYTHON --version)"
       
-      # 3. INSTALAR BANDIT SE NECESSÁRIO
+      # 4. INSTALAR BANDIT SE NECESSÁRIO
       - name: Install Bandit if needed
         run: |
           echo "📦 Checking/installing Bandit..."
@@ -78,7 +106,7 @@ jobs:
             echo "✅ Bandit installed in venv"
           fi
       
-      # 4. EXECUTAR BANDIT SCAN
+      # 5. EXECUTAR BANDIT SCAN
       - name: Run Bandit Security Scan
         id: bandit-scan
         continue-on-error: ${{ inputs.fail-on-issues != 'true' }}
@@ -143,7 +171,7 @@ jobs:
             exit 1
           fi
       
-      # 5. UPLOAD RESULTS
+      # 6. UPLOAD RESULTS
       - name: Upload Security Scan Results
         if: always()
         uses: actions/upload-artifact@v4

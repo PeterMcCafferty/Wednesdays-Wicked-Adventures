@@ -32,6 +32,8 @@ jobs:
       project-root: ${{ needs.setup-environment.outputs.project-root }}
       venv-path: ${{ needs.setup-environment.outputs.venv-path }}
       python-path: ${{ needs.setup-environment.outputs.python-path }}
+      requirements-hash: ${{ needs.setup-environment.outputs.requirements-hash }}
+      python-version: ${{ needs.setup-environment.outputs.python-version }}
       fail-on-issues: "false"
 
   # PHASE 2: BUILD APPLICATION
@@ -42,6 +44,8 @@ jobs:
       project-root: ${{ needs.setup-environment.outputs.project-root }}
       venv-path: ${{ needs.setup-environment.outputs.venv-path }}
       python-path: ${{ needs.setup-environment.outputs.python-path }}
+      requirements-hash: ${{ needs.setup-environment.outputs.requirements-hash }}
+      python-version: ${{ needs.setup-environment.outputs.python-version }}
 
   # PHASE 3: PIPELINE SUMMARY
   pipeline-summary:
