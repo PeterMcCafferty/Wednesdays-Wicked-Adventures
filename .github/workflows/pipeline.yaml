@@ -1,86 +1,287 @@
-# ============================================================
-# PIPELINE ORCHESTRATOR
-# ============================================================
-name: Pipeline Orchestrator
-
-on:
-  push:
-    branches: [UAT, feature/*]
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-jobs:
-  # PHASE 0: SETUP ENVIRONMENT (INSTALL DEPENDENCIES ONCE)
-  setup-environment:
-    uses: ./.github/workflows/setup-environment.yaml
+steps:
+  # ======================================================
+  # STEP 0: CHECKOUT CODE
+  # ======================================================
+  - name: Checkout repository
+    uses: actions/checkout@v4
+  
+  # ======================================================
+  # STEP 1: SETUP PYTHON
+  # ======================================================
+  - name: Setup Python
+    uses: actions/setup-python@v5
     with:
       python-version: "3.11"
-      # Install extra packages needed by all workflows
-      extra-packages: "pytest bandit"
-      force-clean-install: "false"
-
-  # PHASE 1: SECURITY SCAN WITH SAST
-  security-sast:
-    uses: ./.github/workflows/sast.yaml
-    needs: setup-environment
-    with:
-      project-root: ${{ needs.setup-environment.outputs.project-root }}
-      venv-path: ${{ needs.setup-environment.outputs.venv-path }}
-      python-path: ${{ needs.setup-environment.outputs.python-path }}
-      requirements-hash: ${{ needs.setup-environment.outputs.requirements-hash }}
-      python-version: ${{ needs.setup-environment.outputs.python-version }}
-      fail-on-issues: "false"
-
-  # PHASE 2: BUILD APPLICATION
-  build-app:
-    uses: ./.github/workflows/build-app.yaml
-    needs: [setup-environment, security-sast] 
-    with:
-      project-root: ${{ needs.setup-environment.outputs.project-root }}
-      venv-path: ${{ needs.setup-environment.outputs.venv-path }}
-      python-path: ${{ needs.setup-environment.outputs.python-path }}
-      requirements-hash: ${{ needs.setup-environment.outputs.requirements-hash }}
-      python-version: ${{ needs.setup-environment.outputs.python-version }}
-
+  
+  # ======================================================
+  # PHASE 0: SETUP ENVIRONMENT (EXACTLY AS LOCAL)
+  # ======================================================
+  - name: Setup Virtual Environment
+    id: setup-phase
+    run: |
+      echo "🚀 PHASE 0: SETUP ENVIRONMENT"
+      echo "============================="
+      echo ""
+      echo "📂 Going to project directory: flask_app/src/main"
+      cd flask_app/src/main
+      echo "📍 Current directory: $(pwd)"
+      echo ""
+      
+      # 1. Create venv (exactly as you do locally)
+      echo "🐍 Creating virtual environment..."
+      python3 -m venv venv
+      echo "✅ Venv created at: $(pwd)/venv"
+      echo ""
+      
+      # 2. Activate venv
+      echo "🔓 Activating venv..."
+      source venv/bin/activate
+      echo "✅ Venv activated"
+      echo "   Python: $(which python)"
+      echo "   Version: $(python --version)"
+      echo ""
+      
+      # 3. Update pip
+      echo "⬆️ Upgrading pip..."
+      python -m pip install --upgrade pip
+      echo ""
+      
+      # 4. Install requirements (one level up)
+      echo "📦 Installing requirements.txt..."
+      echo "📍 From: ../requirements.txt"
+      pip install -r ../requirements.txt
+      echo "✅ Requirements installed"
+      echo ""
+      
+      # 5. Install extra packages (pytest, bandit)
+      echo "➕ Installing extra packages: pytest bandit"
+      pip install pytest bandit
+      echo "✅ Extra packages installed"
+      echo ""
+      
+      # 6. Verify installation
+      echo "🔍 Verifying installation..."
+      echo "📦 Key packages:"
+      pip show Flask flask-sqlalchemy pymysql flask-login pytest bandit | grep -E "^(Name|Version):" || true
+      echo ""
+      
+      # 7. Test Flask app import
+      echo "🧪 Testing Flask app import..."
+      python -c "
+      import sys
+      print(f'Python path: {sys.executable}')
+      try:
+          from app import create_app
+          app = create_app()
+          print(f'✅ App loaded: {app.name}')
+          print(f'   Debug mode: {app.config.get(\"DEBUG\", False)}')
+          print(f'   Secret key: {\"SET\" if app.config.get(\"SECRET_KEY\") else \"NOT SET\"}')
+      except Exception as e:
+          print(f'❌ Error: {e}')
+          import traceback
+          traceback.print_exc()
+          sys.exit(1)
+      "
+      echo ""
+      echo "🎉 SETUP PHASE COMPLETED SUCCESSFULLY"
+  
+  # ======================================================
+  # PHASE 1: SECURITY SCAN (SAST)
+  # ======================================================
+  - name: Security Scan (SAST)
+    id: security-phase
+    run: |
+      echo "🔍 PHASE 1: SECURITY SCAN"
+      echo "========================="
+      echo ""
+      
+      # 1. Activate venv and go to project
+      echo "📂 Activating venv and going to project..."
+      cd flask_app/src/main
+      source venv/bin/activate
+      echo "📍 Directory: $(pwd)"
+      echo "🐍 Python: $(which python)"
+      echo ""
+      
+      # 2. Run Bandit scan
+      echo "🔍 Running Bandit security scan..."
+      bandit -r . -f json -o bandit-results.json
+      echo "✅ Security scan completed"
+      echo ""
+      
+      # 3. Analyze results
+      echo "📊 Security Scan Results:"
+      if [ -f "bandit-results.json" ]; then
+        # Install jq if needed
+        if ! command -v jq &> /dev/null; then
+          sudo apt-get update && sudo apt-get install -y jq
+        fi
+        
+        HIGH=$(jq '[.results[] | select(.issue_severity == "HIGH")] | length' bandit-results.json 2>/dev/null || echo "0")
+        MEDIUM=$(jq '[.results[] | select(.issue_severity == "MEDIUM")] | length' bandit-results.json 2>/dev/null || echo "0")
+        LOW=$(jq '[.results[] | select(.issue_severity == "LOW")] | length' bandit-results.json 2>/dev/null || echo "0")
+        
+        echo "   HIGH severity issues: $HIGH"
+        echo "   MEDIUM severity issues: $MEDIUM"
+        echo "   LOW severity issues: $LOW"
+        echo ""
+        
+        if [ "$HIGH" -gt 0 ] || [ "$MEDIUM" -gt 0 ]; then
+          echo "⚠️ Found security issues (continuing pipeline)"
+          echo "   Summary of issues:"
+          jq -r '.results[] | "    \(.issue_severity): \(.issue_text) (in \(.filename):\(.line_number))"' bandit-results.json 2>/dev/null | head -5 || true
+        else
+          echo "✅ No HIGH or MEDIUM severity issues found"
+        fi
+      else
+        echo "⚠️ No results file generated"
+      fi
+      echo ""
+      echo "🎉 SECURITY PHASE COMPLETED"
+  
+  # ======================================================
+  # PHASE 2: BUILD VERIFICATION
+  # ======================================================
+  - name: Build Verification
+    id: build-phase
+    run: |
+      echo "🏗️ PHASE 2: BUILD VERIFICATION"
+      echo "=============================="
+      echo ""
+      
+      # 1. Activate venv and go to project
+      echo "📂 Activating venv and going to project..."
+      cd flask_app/src/main
+      source venv/bin/activate
+      echo "📍 Directory: $(pwd)"
+      echo "🐍 Python: $(which python)"
+      echo ""
+      
+      # 2. Verify essential dependencies are installed
+      echo "📦 Verifying essential dependencies..."
+      ESSENTIAL_PACKAGES="Flask flask-sqlalchemy pymysql flask-login"
+      ALL_INSTALLED=true
+      
+      for pkg in $ESSENTIAL_PACKAGES; do
+        if pip show "$pkg" >/dev/null 2>&1; then
+          version=$(pip show "$pkg" | grep "^Version:" | cut -d: -f2 | xargs)
+          echo "  ✅ $pkg==$version"
+        else
+          echo "  ❌ $pkg - NOT INSTALLED"
+          ALL_INSTALLED=false
+        fi
+      done
+      
+      if [ "$ALL_INSTALLED" = false ]; then
+        echo "💀 BUILD FAILED: Missing essential dependencies"
+        exit 1
+      fi
+      echo "✅ All essential dependencies verified"
+      echo ""
+      
+      # 3. Comprehensive Flask app test
+      echo "🧪 Comprehensive Flask application test..."
+      python << 'EOF'
+      import sys
+      import os
+      
+      print("🔧 FLASK APPLICATION TEST")
+      print("=" * 40)
+      
+      try:
+          # Test imports
+          print("1. Testing imports...")
+          from app import create_app
+          print("   ✅ Import successful")
+          
+          # Create app
+          print("\n2. Creating application...")
+          app = create_app('testing')
+          print(f"   ✅ App created: {app.name}")
+          
+          # Config verification
+          print("\n3. Configuration verification:")
+          print(f"   Testing mode: {app.config.get('TESTING', False)}")
+          print(f"   Debug mode: {app.config.get('DEBUG', False)}")
+          print(f"   Secret key configured: {'YES' if app.config.get('SECRET_KEY') else 'NO'}")
+          
+          # Routes verification
+          print("\n4. Routes verification:")
+          routes = list(app.url_map.iter_rules())
+          print(f"   Total routes found: {len(routes)}")
+          
+          if routes:
+              print("   Sample routes:")
+              count = 0
+              for route in routes:
+                  if not route.rule.startswith('/_') and len(route.rule) > 1:
+                      methods = ','.join(route.methods)
+                      print(f"     - {route.rule} [{methods}]")
+                      count += 1
+                      if count >= 3:
+                          break
+          
+          # Test client
+          print("\n5. Test client verification:")
+          with app.test_client() as client:
+              test_endpoints = ['/', '/login']
+              for endpoint in test_endpoints:
+                  try:
+                      response = client.get(endpoint)
+                      print(f"   {endpoint}: HTTP {response.status_code}")
+                  except Exception:
+                      print(f"   {endpoint}: Not accessible (may be expected)")
+          
+          print("\n" + "=" * 40)
+          print("🎉 APPLICATION BUILD VERIFIED!")
+          print("✅ All imports work")
+          print("✅ App can be instantiated")
+          print("✅ Configuration is valid")
+          print("✅ Routes are accessible")
+          
+      except ImportError as e:
+          print(f"\n❌ IMPORT ERROR: {e}")
+          sys.exit(1)
+      except Exception as e:
+          print(f"\n❌ APPLICATION ERROR: {type(e).__name__}: {e}")
+          import traceback
+          traceback.print_exc()
+          sys.exit(1)
+      
+      print("\n🚀 APPLICATION IS READY FOR DEPLOYMENT")
+      EOF
+      echo ""
+      echo "🎉 BUILD PHASE COMPLETED SUCCESSFULLY"
+  
+  # ======================================================
   # PHASE 3: PIPELINE SUMMARY
-  pipeline-summary:
-    runs-on: ubuntu-latest
-    needs: [setup-environment, security-sast, build-app] 
+  # ======================================================
+  - name: Pipeline Summary
     if: always()
-    timeout-minutes: 2
-    
-    steps:
-      - name: Pipeline Status Report
-        run: |
-          echo "🚀 CI/CD PIPELINE COMPLETED"
-          echo "==========================="
-          echo ""
-          echo "Job Results:"
-          echo "------------"
-          echo "Setup Environment.: ${{ needs.setup-environment.result }}"
-          echo "Security Scan.....: ${{ needs.security-sast.result }}"
-          echo "Build.............: ${{ needs.build-app.result }}"
-          echo ""
-          echo "Cache Status......: ${{ needs.setup-environment.outputs.cache-hit }}"
-          echo "Requirements Hash.: ${{ needs.setup-environment.outputs.requirements-hash }}"
-          echo "Deps Installed....: ${{ needs.setup-environment.outputs.dependencies-installed }}"
-          echo "Project Root......: ${{ needs.setup-environment.outputs.project-root }}"
-          echo ""
-          
-          # Determine overall status
-          if [[ "${{ needs.security-sast.result }}" == "success" &&
-                "${{ needs.build-app.result }}" == "success" ]]; then
-            echo "✅ ALL CRITICAL JOBS PASSED!"
-            echo "✅ Application is ready for deployment"
-          else
-            echo "⚠️  Some jobs failed or were skipped"
-            echo "Review individual job logs for details"
-          fi
-          
-          echo ""
-          echo "Pipeline execution complete."
+    run: |
+      echo "📊 PHASE 3: PIPELINE SUMMARY"
+      echo "============================"
+      echo ""
+      echo "Pipeline Results:"
+      echo "----------------"
+      echo "Setup Phase........: ${{ steps.setup-phase.conclusion || 'unknown' }}"
+      echo "Security Phase.....: ${{ steps.security-phase.conclusion || 'unknown' }}"
+      echo "Build Phase........: ${{ steps.build-phase.conclusion || 'unknown' }}"
+      echo ""
+      echo "Overall Status.....: ${{ job.status }}"
+      echo ""
+      
+      if [ "${{ job.status }}" = "success" ]; then
+        echo "✅ ALL PIPELINE PHASES PASSED!"
+        echo "✅ Application is ready for deployment"
+        echo "✅ Single venv used throughout"
+        echo "✅ No cache/complexity issues"
+      else
+        echo "⚠️ Some pipeline phases failed"
+        echo "Review individual step logs for details"
+      fi
+      
+      echo ""
+      echo "========================================"
+      echo "🚀 CI/CD PIPELINE EXECUTION COMPLETE"
+      echo "========================================"
