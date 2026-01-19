@@ -15,6 +15,7 @@ class User(UserMixin,db.Model):
     password = db.Column(db.String(100), nullable=False) 
     role_id = db.Column(db.Integer, db.ForeignKey('roles.role_id'))
     bookings = db.relationship('Booking', backref='user')
+    role = db.relationship('Role', back_populates='users')
 
     def get_id(self):
         return str(self.user_id)
@@ -44,7 +45,8 @@ class Role(db.Model):
     __tablename__ = 'roles'
     role_id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(64), unique=True)
-    users = db.relationship('User', backref='role')
+   # users = db.relationship('User', backref='role')
+    users = db.relationship('User', back_populates='role')
 
     def to_json(self):
         return {
@@ -118,6 +120,24 @@ class Booking(db.Model):
     
     def __repr__(self):
         return f''
+    
+class Message(db.Model):
+    __tablename__ = 'messages'
+    message_id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=db.func.now())
+
+    def to_json(self):
+        return {
+            'message_id': self.message_id,
+            'name': self.name,
+            'email': self.email,
+            'message': self.message,
+            'created_at': self.created_at.isoformat()
+        }
+
 
 class AppModelView(ModelView):
     def is_accessible(self):
@@ -207,5 +227,20 @@ class ParkView(AppModelView):
         price=dict(validators=[DataRequired()]),
         wait_time=dict(validators=[DataRequired()]),
         height_requirement=dict(validators=[DataRequired()]),
+    )
+
+class MessageView(AppModelView):
+   
+    column_list = ('name', 'email', 'message', 'created_at')
+    column_labels = dict(name='Name', email='Email', message='Message', created_at='Create Date')
+    column_filters = ('email',)
+    column_searchable_list = ('name', 'email', 'message')
+    column_sortable_list = ()
+    column_default_sort = ('created_at', True)
+    form_columns = ('name', 'email', 'message', 'created_at')
+    form_args = dict(
+        name=dict(validators=[DataRequired()]),
+        email=dict(validators=[DataRequired()]),
+        message=dict(validators=[DataRequired()])
     )
 
