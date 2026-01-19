@@ -6,31 +6,23 @@ name: SAST Security Scan
 on:
   workflow_call:
     inputs:
-      python-version:
-        description: "Python version to use"
+      project-root:
+        description: "Project root directory from setup-environment"
         required: true
         type: string
-        default: "3.11"
-      working-directory:
-        description: "Directory where the project resides"
+      venv-path:
+        description: "Path to virtual environment"
         required: true
         type: string
-        default: "."
+      python-path:
+        description: "Path to Python executable in venv"
+        required: true
+        type: string
       fail-on-issues:
         description: "Fail the pipeline if high/medium issues found"
         required: true
         type: string
         default: "true"
-      dependencies-installed:
-        description: "Indicates if dependencies are already installed from setup-environment"
-        required: false
-        type: string
-        default: "false"
-      cache-key:
-        description: "Cache key from setup-environment for dependency cache"
-        required: false
-        type: string
-        default: ""
       config-path:
         description: "Path to Bandit config file"
         required: false
@@ -41,62 +33,64 @@ jobs:
   bandit-scan:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    
+    env:
+      VENV_PYTHON: ${{ inputs.python-path }}
+      VENV_PIP: ${{ inputs.venv-path }}/bin/pip
+      VENV_PATH: ${{ inputs.venv-path }}
+
     steps:
       # 1. Checkout
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      # 2. Setup Python
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ inputs.python-version }}
-      
-      # 3. Restore Python dependencies cache
-      - name: Restore Python dependencies cache
-        if: ${{ inputs.dependencies-installed == 'true' && inputs.cache-key != '' }}  # ⬅️ Compare como string
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/pip
-            /opt/hostedtoolcache/Python
-          key: ${{ inputs.cache-key }}
-          restore-keys: |
-            ${{ runner.os }}-python-${{ inputs.python-version }}-deps-
-      
-      # 4. Verify dependencies or install Bandit
-      - name: Install Bandit (or verify dependencies)
+      # 2. VERIFICAR VENV
+      - name: Verify virtual environment
         run: |
-          if [ "${{ inputs.dependencies-installed }}" = "true" ] && [ -n "${{ inputs.cache-key }}" ]; then
-            echo "✅ Using dependencies from setup-environment"
-            echo "Checking if bandit is available..."
-            
-            if pip show bandit >/dev/null 2>&1; then
-              echo "✅ Bandit already installed via setup-environment"
-              bandit_version=$(pip show bandit | grep "^Version:" | cut -d: -f2 | xargs)
-              echo "   Bandit version: $bandit_version"
-            else
-              echo "⚠️ Bandit not found in cache, installing..."
-              pip install bandit
-            fi
+          echo "🔍 Verifying virtual environment..."
+          
+          if [ ! -d "$VENV_PATH" ]; then
+            echo "❌ ERROR: Virtual environment not found at: $VENV_PATH"
+            exit 1
+          fi
+          
+          if [ ! -f "$VENV_PYTHON" ]; then
+            echo "❌ ERROR: Python not found in venv: $VENV_PYTHON"
+            exit 1
+          fi
+          
+          echo "✅ Venv verified:"
+          echo "   Path: $VENV_PATH"
+          echo "   Python: $VENV_PYTHON"
+          echo "   Version: $($VENV_PYTHON --version)"
+      
+      # 3. INSTALAR BANDIT SE NECESSÁRIO
+      - name: Install Bandit if needed
+        run: |
+          echo "📦 Checking/installing Bandit..."
+          
+          # Verificar se bandit está instalado no venv
+          if $VENV_PIP show bandit >/dev/null 2>&1; then
+            bandit_version=$($VENV_PIP show bandit | grep "^Version:" | cut -d: -f2 | xargs)
+            echo "✅ Bandit already installed in venv: version $bandit_version"
           else
-            echo "⚠️ Running in standalone mode (without setup-environment)"
-            echo "Installing Bandit and dependencies..."
-            python -m pip install --upgrade pip
-            pip install bandit
+            echo "⚠️ Bandit not found in venv, installing..."
+            $VENV_PIP install bandit
+            echo "✅ Bandit installed in venv"
           fi
       
-      # 5. Run Bandit Scan
+      # 4. EXECUTAR BANDIT SCAN
       - name: Run Bandit Security Scan
         id: bandit-scan
-        continue-on-error: ${{ inputs.fail-on-issues != 'true' }}  # ⬅️ Compare como string
+        continue-on-error: ${{ inputs.fail-on-issues != 'true' }}
         run: |
-          # Navigate to the correct directory
-          cd "${{ inputs.working-directory }}"
-          echo "🔍 Running Bandit security scan in: $(pwd)"
+          echo "🔍 Running Bandit security scan..."
           
-          # Check config file (relative to working directory)
+          # Ir para o diretório correto
+          echo "📂 Changing to project directory: ${{ inputs.project-root }}"
+          cd "${{ inputs.project-root }}"
+          echo "📍 Current directory: $(pwd)"
+          
+          # Configuração do Bandit
           if [ ! -f "${{ inputs.config-path }}" ]; then
             echo "ℹ️ Using default Bandit settings"
             CONFIG_ARG=""
@@ -104,30 +98,32 @@ jobs:
             CONFIG_ARG="-c ${{ inputs.config-path }}"
           fi
           
-          # Run Bandit with exit code control
-          echo "🔍 Running Bandit security scan..."
-          echo "Using dependencies from: ${{ inputs.dependencies-installed == 'true' && 'setup-environment' || 'standalone installation' }}"
+          # Executar Bandit usando Python do venv
+          echo "🚀 Executing: $VENV_PYTHON -m bandit $CONFIG_ARG -r . -f json -o bandit-results.json"
+          $VENV_PYTHON -m bandit $CONFIG_ARG -r . -f json -o bandit-results.json
           
-          bandit $CONFIG_ARG -r . -f json -o bandit-results.json
-          
-          # Check if results file was created
+          # Processar resultados
           if [ -f "bandit-results.json" ]; then
             echo "✅ Scan completed successfully"
             
-            # Simple count using jq (installed by default)
-            HIGH=$(jq '[.results[] | select(.issue_severity == "HIGH")] | length' bandit-results.json || echo "0")
-            MEDIUM=$(jq '[.results[] | select(.issue_severity == "MEDIUM")] | length' bandit-results.json || echo "0")
-            LOW=$(jq '[.results[] | select(.issue_severity == "LOW")] | length' bandit-results.json || echo "0")
+            # Instalar jq se necessário para processar JSON
+            if ! command -v jq &> /dev/null; then
+              sudo apt-get update && sudo apt-get install -y jq
+            fi
             
-            echo "📊 Scan Results:"
-            echo "   HIGH severity: $HIGH"
-            echo "   MEDIUM severity: $MEDIUM"
-            echo "   LOW severity: $LOW"
+            HIGH=$(jq '[.results[] | select(.issue_severity == "HIGH")] | length' bandit-results.json 2>/dev/null || echo "0")
+            MEDIUM=$(jq '[.results[] | select(.issue_severity == "MEDIUM")] | length' bandit-results.json 2>/dev/null || echo "0")
+            LOW=$(jq '[.results[] | select(.issue_severity == "LOW")] | length' bandit-results.json 2>/dev/null || echo "0")
+            
+            echo "📊 Security Scan Results:"
+            echo "   HIGH severity issues: $HIGH"
+            echo "   MEDIUM severity issues: $MEDIUM"
+            echo "   LOW severity issues: $LOW"
             
             if [ "$HIGH" -gt 0 ] || [ "$MEDIUM" -gt 0 ]; then
               echo "⚠️ Found $HIGH HIGH and $MEDIUM MEDIUM severity issues"
               
-              if [ "${{ inputs.fail-on-issues }}" = "true" ]; then  # ⬅️ Já está correto
+              if [ "${{ inputs.fail-on-issues }}" = "true" ]; then
                 echo "❌ Failing pipeline due to security issues"
                 exit 1
               else
@@ -136,16 +132,22 @@ jobs:
             else
               echo "✅ No HIGH or MEDIUM severity issues found"
             fi
+            
+            # Mostrar resumo das issues
+            echo ""
+            echo "🔍 Issue summary:"
+            jq -r '.results[] | "\(.issue_severity): \(.issue_text) (in \(.filename):\(.line_number))"' bandit-results.json 2>/dev/null | head -10 || true
+            
           else
             echo "❌ No results file generated"
             exit 1
           fi
       
-      # 6. Upload results (always, even if failed)
+      # 5. UPLOAD RESULTS
       - name: Upload Security Scan Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: security-scan-results
-          path: ${{ inputs.working-directory }}/bandit-results.json
-          retention-days: 30  # Keep security logs longer
+          path: ${{ inputs.project-root }}/bandit-results.json
+          retention-days: 30

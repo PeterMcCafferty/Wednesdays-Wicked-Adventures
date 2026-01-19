@@ -32,30 +32,36 @@ on:
       cache-hit:
         description: "Whether dependency cache was hit"
         value: ${{ jobs.setup.outputs.cache-hit }}
-
       cache-key:
         description: "Cache key for dependencies"
         value: ${{ jobs.setup.outputs.cache-key }}
-
       requirements-hash:
         description: "Hash of requirements.txt"
         value: ${{ jobs.setup.outputs.requirements-hash }}
-
       python-version:
         description: "Python version used"
         value: ${{ jobs.setup.outputs.python-version }}
-
       dependencies-installed:
         description: "Whether dependencies were installed"
         value: ${{ jobs.setup.outputs.dependencies-installed }}
-
-      python-root:
-        description: "Root directory for Python imports"
-        value: ${{ jobs.setup.outputs.python-root }}
-
+      project-root:
+        description: "Project root directory (flask_app/src/main)"
+        value: ${{ jobs.setup.outputs.project-root }}
+      working-directory:
+        description: "Working directory for compatibility"
+        value: ${{ jobs.setup.outputs.project-root }}
       workspace-path:
         description: "GitHub workspace path"
         value: ${{ jobs.setup.outputs.workspace-path }}
+      app-entrypoint:
+        description: "Path to app entry point"
+        value: ${{ jobs.setup.outputs.app-entrypoint }}
+      venv-path:
+        description: "Path to virtual environment"
+        value: ${{ jobs.setup.outputs.venv-path }}
+      python-path:
+        description: "Path to Python executable in venv"
+        value: ${{ jobs.setup.outputs.python-path }}
 
 jobs:
   setup:
@@ -69,185 +75,294 @@ jobs:
     outputs:
       cache-hit: ${{ steps.cache-deps.outputs.cache-hit }}
       cache-key: ${{ steps.generate-cache-key.outputs.cache-key }}
-      dependencies-installed: ${{ steps.install-deps.outputs.deps-installed }}
+      dependencies-installed: ${{ steps.create-venv-and-install.outputs.deps-installed }}
       python-version: ${{ inputs.python-version }}
       requirements-hash: ${{ steps.generate-cache-key.outputs.requirements-hash }}
-      python-root: ${{ steps.configure-paths.outputs.python-root }}
+      project-root: ${{ steps.configure-paths.outputs.project-root }}
+      working-directory: ${{ steps.configure-paths.outputs.project-root }}
       workspace-path: ${{ steps.configure-paths.outputs.workspace-path }}
+      app-entrypoint: ${{ steps.configure-paths.outputs.app-entrypoint }}
+      venv-path: ${{ steps.create-venv-and-install.outputs.venv-path }}
+      python-path: ${{ steps.create-venv-and-install.outputs.python-path }}
     
-    steps:
-      # ------------------------------------------------------
-      # Step 1: Checkout repository
-      # ------------------------------------------------------
+    steps:  
+      # STEP 1: CHECKOUT REPOSITORY
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      # ------------------------------------------------------
-      # Step 2: Set up Python
-      # ------------------------------------------------------
+      # STEP 2: SET UP PYTHON
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ inputs.python-version }}
       
-      # ------------------------------------------------------
-      # Step 3: Configure Python environment paths
-      # ------------------------------------------------------
-      - name: Configure Python environment paths
+      # STEP 3: CONFIGURE PROJECT STRUCTURE
+      - name: Configure project structure
         id: configure-paths
         run: |
-          echo "🔧 Configuring Python environment paths..."
+          echo "🔧 Configuring project structure (same as local)..."
           
+          # Paths EXACTLY as you use locally
           WORKSPACE="${{ github.workspace }}"
-          SRC_DIR="$WORKSPACE/flask_app/src"
+          PROJECT_ROOT="$WORKSPACE/flask_app/src/main"
+          APP_ENTRYPOINT="$PROJECT_ROOT/app/__init__.py"
+          REQUIREMENTS_PATH="$WORKSPACE/flask_app/src/requirements.txt"
           
-          # Configuring PYTHONPATH for execution
-          echo "PYTHONPATH=$SRC_DIR:$WORKSPACE" >> $GITHUB_ENV
+          # Verify if structure exists
+          if [ ! -f "$APP_ENTRYPOINT" ]; then
+            echo "❌ ERROR: App entry point not found: $APP_ENTRYPOINT"
+            echo "📁 Directory content:"
+            find "$WORKSPACE" -name "*.py" | head -20 || true
+            exit 1
+          fi
           
-          # Export as outputs for other workflows
-          echo "python-root=$SRC_DIR" >> $GITHUB_OUTPUT
+          if [ ! -f "$REQUIREMENTS_PATH" ]; then
+            echo "❌ ERROR: requirements.txt not found: $REQUIREMENTS_PATH"
+            echo "📁 Project structure:"
+            find "$WORKSPACE" -name "*.txt" | head -20 || true
+            exit 1
+          fi
+          
+          # Configure environment variables (as in local)
+          echo "PROJECT_ROOT=$PROJECT_ROOT" >> $GITHUB_ENV
+          echo "VENV_PATH=$PROJECT_ROOT/venv" >> $GITHUB_ENV
+          echo "REQUIREMENTS_PATH=$REQUIREMENTS_PATH" >> $GITHUB_ENV
+          
+          # Flask variables (for when we activate venv)
+          echo "FLASK_APP_PATH=app/__init__.py" >> $GITHUB_ENV  # Relative to PROJECT_ROOT
+          echo "FLASK_ENV=testing" >> $GITHUB_ENV
+          
+          # Export as outputs
+          echo "project-root=$PROJECT_ROOT" >> $GITHUB_OUTPUT
           echo "workspace-path=$WORKSPACE" >> $GITHUB_OUTPUT
+          echo "app-entrypoint=$APP_ENTRYPOINT" >> $GITHUB_OUTPUT
           
-          echo "✅ Python paths configured"
-          echo "   PYTHONPATH: $SRC_DIR:$WORKSPACE"
-          echo "   Source dir: $SRC_DIR"
+          echo "✅ Structure configured:"
+          echo "   Project root: $PROJECT_ROOT"
+          echo "   Venv path: $PROJECT_ROOT/venv"
+          echo "   App entrypoint: $APP_ENTRYPOINT"
+          echo "   Requirements: $REQUIREMENTS_PATH"
       
-      # ------------------------------------------------------
-      # Step 4: Generate cache key from requirements.txt
-      # ------------------------------------------------------
+      # STEP 4: GENERATE CACHE KEY
       - name: Generate cache key
         id: generate-cache-key
         run: |
           echo "🔑 Generating cache key..."
           
-          # Define the exact path to requirements.txt
-          REQ_FILE="flask_app/src/requirements.txt"
+          REQ_FILE="$REQUIREMENTS_PATH"
           
           if [ -f "$REQ_FILE" ]; then
-            echo "✅ Found requirements.txt at: $REQ_FILE"
-            
-            # Generate hash from the requirements file
+            # Hash of dependencies + project structure
             REQ_HASH=$(sha256sum "$REQ_FILE" | cut -d' ' -f1 | head -c 12)
             
-            # Build cache key
-            CACHE_KEY="${{ runner.os }}-python-${{ inputs.python-version }}-deps-${REQ_HASH}"
+            # Specific key for venv
+            CACHE_KEY="venv-${{ runner.os }}-python-${{ inputs.python-version }}-deps-${REQ_HASH}"
             
-            echo "Requirements hash: ${REQ_HASH}"
+            echo "📦 requirements.txt found:"
+            echo "Location: $REQ_FILE"
+            echo "Content (first 10 lines):"
+            head -10 "$REQ_FILE" || true
+            echo ""
+            echo "Hash: ${REQ_HASH}"
             echo "Cache key: ${CACHE_KEY}"
             
             echo "cache-key=${CACHE_KEY}" >> $GITHUB_OUTPUT
             echo "requirements-hash=${REQ_HASH}" >> $GITHUB_OUTPUT
-            echo "req-file=${REQ_FILE}" >> $GITHUB_OUTPUT
           else
             echo "❌ ERROR: requirements.txt not found at $REQ_FILE"
-            echo "Please check the path: flask_app/src/requirements.txt"
             exit 1
           fi
       
-      # ------------------------------------------------------
-      # Step 5: Cache Python dependencies
-      # ------------------------------------------------------
-      - name: Cache Python dependencies
+      # STEP 5: CACHE VIRTUAL ENVIRONMENT
+      - name: Cache virtual environment
         id: cache-deps
         uses: actions/cache@v4
         with:
-          # What to cache
+          # Cache the ENTIRE VENV (same as local)
           path: |
+            ${{ env.VENV_PATH }}
             ~/.cache/pip
-            /opt/hostedtoolcache/Python
-          # Cache key based on requirements.txt hash
           key: ${{ steps.generate-cache-key.outputs.cache-key }}
-          # Fallback keys if exact match not found
           restore-keys: |
-            ${{ runner.os }}-python-${{ inputs.python-version }}-deps-
-            ${{ runner.os }}-python-${{ inputs.python-version }}-
+            venv-${{ runner.os }}-python-${{ inputs.python-version }}-deps-
+            venv-${{ runner.os }}-python-${{ inputs.python-version }}-
       
-      # ------------------------------------------------------
-      # Step 6: Install dependencies
-      # ------------------------------------------------------
-      - name: Install dependencies
-        id: install-deps
+      # STEP 6: CREATE VENV AND INSTALL (EXACTLY AS YOU DO LOCALLY)
+      - name: Create venv and install dependencies
+        id: create-venv-and-install
         env:
           FORCE_CLEAN: ${{ inputs.force-clean-install }}
           EXTRA_PKGS: ${{ inputs.extra-packages }}
+          WORKSPACE: ${{ github.workspace }}
+          REQUIREMENTS_PATH: ${{ github.workspace }}/flask_app/src/requirements.txt
+          PROJECT_ROOT: ${{ github.workspace }}/flask_app/src/main
         run: |
-          echo "📦 INSTALLING DEPENDENCIES"
-          echo "=========================="
-          echo "Cache hit: ${{ steps.cache-deps.outputs.cache-hit }}"
-          echo "Force clean: $FORCE_CLEAN"
-          echo "Extra packages: $EXTRA_PKGS"
-          echo "PYTHONPATH: $PYTHONPATH"  # ⬅️ Mostra o PYTHONPATH configurado
+          echo "🚀 REPLICATING LOCAL SETUP"
+          echo "========================="
           
-          # Upgrade pip first
-          python -m pip install --upgrade pip
+          # 1. Go to main directory (as you do)
+          echo "📂 Going to: $PROJECT_ROOT"
+          cd "$PROJECT_ROOT"
+          echo "📍 Current directory: $(pwd)"
+          echo "📍 Content:"
+          ls -la || true
           
-          # Check if we should skip installation
-          if [ "${{ steps.cache-deps.outputs.cache-hit }}" == 'true' ] && [ "$FORCE_CLEAN" == 'false' ]; then
-            echo "✅ Cache hit - Dependencies already installed"
-            echo "Verifying installation without downloading..."
-            
-            # Quick verification (no network)
-            pip install -r flask_app/src/requirements.txt --no-deps --quiet || {
-              echo "⚠️ Quick verification failed, installing properly..."
-              pip install -r flask_app/src/requirements.txt
-            }
-            
-            echo "deps-installed=true" >> $GITHUB_OUTPUT
-            exit 0
+          # Check if venv already exists from cache
+          if [ -d "venv" ] && [ "${{ steps.cache-deps.outputs.cache-hit }}" == 'true' ] && [ "$FORCE_CLEAN" == 'false' ]; then
+            echo "✅ Venv found in cache"
+            echo "📁 Venv content:"
+            ls -la venv/bin/python* 2>/dev/null || echo "   (venv empty or not initialized)"
+          else
+            # 2. Create venv (python3 -m venv venv) - USING python3!
+            echo "🐍 Creating venv..."
+            python3 -m venv venv
+            echo "✅ Venv created at: $(pwd)/venv"
           fi
           
-          # Fresh installation (cache miss or forced)
-          echo "🔄 Installing dependencies from requirements.txt..."
+          # 3. Activate venv (source venv/bin/activate)
+          echo "🔓 Activating venv..."
+          source venv/bin/activate
           
-          # Install main requirements
-          pip install -r flask_app/src/requirements.txt
+          # Verify we're in the venv
+          echo ""
+          echo "🧪 Venv verification:"
+          echo "   Python executable: $(which python)"
+          echo "   Python version: $(python --version)"
+          echo "   Pip executable: $(which pip)"
           
-          # Install extra packages if specified
+          # 4. Update pip inside venv - USING python3!
+          echo "⬆️ Upgrading pip..."
+          python3 -m pip install --upgrade pip
+          
+          # 5. Install requirements.txt (ONE LEVEL UP!)
+          echo "📦 Installing requirements.txt..."
+          echo "📍 Requirements path: $REQUIREMENTS_PATH"
+          
+          if [ -f "$REQUIREMENTS_PATH" ]; then
+            echo "✅ Found requirements.txt"
+            echo "📋 requirements.txt content:"
+            cat "$REQUIREMENTS_PATH"
+            echo ""
+            
+            pip install -r "$REQUIREMENTS_PATH"
+            echo "✅ Requirements installed"
+          else
+            echo "❌ ERROR: requirements.txt not found at $REQUIREMENTS_PATH"
+            echo "📍 Searching for requirements.txt files:"
+            find "$WORKSPACE" -name "requirements.txt" 2>/dev/null || true
+            exit 1
+          fi
+          
+          # 6. Install extra packages if specified
           if [ -n "$EXTRA_PKGS" ]; then
-            echo "Installing extra packages: $EXTRA_PKGS"
+            echo "➕ Extra packages: $EXTRA_PKGS"
             pip install $EXTRA_PKGS
           fi
           
-          echo "✅ All dependencies installed successfully"
-          echo "deps-installed=true" >> $GITHUB_OUTPUT
-      
-      # ------------------------------------------------------
-      # Step 7: Verify installation
-      # ------------------------------------------------------
-      - name: Verify installation
-        if: always()
-        run: |
-          echo "🔍 VERIFICATION REPORT"
-          echo "======================"
-          
-          # Check critical packages for Flask app
-          echo "Checking critical packages:"
-          for pkg in Flask flask-sqlalchemy pymysql flask-login; do
-            if pip show "$pkg" > /dev/null 2>&1; then
-              VERSION=$(pip show "$pkg" | grep Version | cut -d' ' -f2)
-              echo "  ✅ $pkg==$VERSION"
-            else
-              echo "  ❌ $pkg not installed"
-            fi
-          done
-          
-          # Summary
+          # 7. Verify installation (as you would locally)
           echo ""
-          echo "📊 INSTALLATION SUMMARY:"
-          echo "Cache: ${{ steps.cache-deps.outputs.cache-hit }}"
-          echo "Requirements hash: ${{ steps.generate-cache-key.outputs.requirements-hash }}"
-          echo "Total packages: $(pip list | wc -l)"
-          echo "PYTHONPATH: $PYTHONPATH"  # ⬅️ Adicione esta linha
+          echo "🔍 Installation verification:"
+          echo "📦 Flask packages installed:"
+          pip list | grep -i flask || echo "   (no flask packages found)"
+          echo ""
           
-      # ------------------------------------------------------
-      # Step 8: Upload environment info as artifact
-      # ------------------------------------------------------
-      - name: Upload environment info
+          # 8. Test if app can be imported (pre-test of flask run)
+          echo "🧪 Testing Flask app import..."
+          python -c "
+          import sys
+          import os
+          print(f'📁 Current directory: {os.getcwd()}')
+          print(f'🐍 Python path: {sys.path[:3]}...')
+          try:
+              # Add current directory to path
+              sys.path.insert(0, '.')
+              from app import create_app
+              app = create_app()
+              print(f'✅ Flask app loaded: {app.name}')
+              print(f'   Mode: {app.config.get(\"ENV\", \"unknown\")}')
+              print(f'   Debug: {app.config.get(\"DEBUG\", False)}')
+              print(f'   Secret Key configured: {\"yes\" if app.config.get(\"SECRET_KEY\") else \"no\"}')
+          except ImportError as e:
+              print(f'❌ Import error: {e}')
+              print(f'   Full path: {sys.path}')
+              import traceback
+              traceback.print_exc()
+              sys.exit(1)
+          except Exception as e:
+              print(f'⚠️  Error creating app: {e}')
+              import traceback
+              traceback.print_exc()
+          "
+          
+          # Save outputs
+          echo "venv-path=$PROJECT_ROOT/venv" >> $GITHUB_OUTPUT
+          echo "python-path=$PROJECT_ROOT/venv/bin/python" >> $GITHUB_OUTPUT
+          echo "deps-installed=true" >> $GITHUB_OUTPUT
+          
+          echo ""
+          echo "🎉 SETUP COMPLETE WITH VENV!"
+          echo "📋 SUMMARY:"
+          echo "   Directory: $PROJECT_ROOT"
+          echo "   Venv: $PROJECT_ROOT/venv"
+          echo "   Requirements: $REQUIREMENTS_PATH"
+          echo "   Cache hit: ${{ steps.cache-deps.outputs.cache-hit }}"
+          echo ""
+          echo "💡 To run the app (as locally):"
+          echo "   1. cd $PROJECT_ROOT"
+          echo "   2. source venv/bin/activate"
+          echo "   3. flask run"
+          echo ""
+          echo "⚡ To test now in pipeline:"
+          echo "   source venv/bin/activate && flask --app app/__init__.py --debug run &"
+      
+      # STEP 7: FINAL VERIFICATION AND ARTIFACT
+      - name: Final verification and artifact
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: environment-info
-          path: |
-            ~/.cache/pip/
-            /opt/hostedtoolcache/Python/
-          retention-days: 7
+        env:
+          PROJECT_ROOT: ${{ github.workspace }}/flask_app/src/main
+          VENV_PATH: ${{ github.workspace }}/flask_app/src/main/venv
+        run: |
+          echo "📊 FINAL SETUP VERIFICATION"
+          echo "============================="
+          
+          # Check if venv is working
+          if [ -d "$VENV_PATH" ]; then
+            echo "✅ Venv found at: $VENV_PATH"
+            echo "📁 Venv size:"
+            du -sh "$VENV_PATH" 2>/dev/null || echo "   (could not calculate)"
+          else
+            echo "⚠️  Venv not found at: $VENV_PATH"
+          fi
+          
+          # Create configuration file for next workflows
+          echo "📄 Creating environment configuration file..."
+          cat > "$PROJECT_ROOT/venv/.pipeline_env" << EOF
+          # Environment configuration - CI/CD Pipeline
+          # Generated automatically at: $(date)
+          
+          PROJECT_ROOT=$PROJECT_ROOT
+          VENV_PATH=$VENV_PATH
+          PYTHON_PATH=$VENV_PATH/bin/python
+          PIP_PATH=$VENV_PATH/bin/pip
+          FLASK_APP=app/__init__.py
+          FLASK_ENV=testing
+          PYTHON_VERSION=${{ inputs.python-version }}
+          REQUIREMENTS_HASH=${{ steps.generate-cache-key.outputs.requirements-hash }}
+          CACHE_HIT=${{ steps.cache-deps.outputs.cache-hit }}
+          
+          # Useful commands:
+          # source \$VENV_PATH/bin/activate
+          # flask --app \$FLASK_APP run
+          # python -m pytest tests/
+          EOF
+          
+          echo "📋 Environment file content:"
+          cat "$PROJECT_ROOT/venv/.pipeline_env"
+          
+          echo ""
+          echo "✅ SETUP-ENVIRONMENT COMPLETED SUCCESSFULLY"
+          echo "📤 Outputs available for next jobs:"
+          echo "   project-root: $PROJECT_ROOT"
+          echo "   venv-path: $VENV_PATH"
+          echo "   requirements-hash: ${{ steps.generate-cache-key.outputs.requirements-hash }}"
+          echo "   cache-hit: ${{ steps.cache-deps.outputs.cache-hit }}"

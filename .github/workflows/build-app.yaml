@@ -10,24 +10,24 @@ name: Build App
 on:
   workflow_call:
     inputs:
-      python-version:
-        description: "Python version to use for building"
+      project-root:
+        description: "Project root directory from setup-environment"
+        required: true
+        type: string
+      venv-path:
+        description: "Path to virtual environment"
+        required: true
+        type: string
+      python-path:
+        description: "Path to Python executable in venv"
         required: true
         type: string
       working-directory:
-        description: "Directory of the app to build"
-        required: true
-        type: string
-      dependencies-installed:
-        description: "Indicates if dependencies are already installed from setup-environment"
-        required: false
-        type: string
-        default: "false"
-      cache-key:
-        description: "Cache key from setup-environment for dependency cache"
+        description: "Directory of the app to build (for compatibility)"
         required: false
         type: string
         default: ""
+
 
 jobs:
   build:
@@ -35,147 +35,173 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10  # Reduced since no installation needed
     
+    env:
+      VENV_PYTHON: ${{ inputs.python-path }}
+      VENV_PIP: ${{ inputs.venv-path }}/bin/pip
+      VENV_PATH: ${{ inputs.venv-path }}
+      PROJECT_ROOT: ${{ inputs.project-root }}
+
     steps:
       # Step 1: Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Set up Python
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ inputs.python-version }}
-
-      # Step 3: Restore Python dependencies cache
-      - name: Restore Python dependencies cache
-        if: ${{ inputs.dependencies-installed == 'true' && inputs.cache-key != '' }}
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/pip
-            /opt/hostedtoolcache/Python
-          key: ${{ inputs.cache-key }}
-          restore-keys: |
-            ${{ runner.os }}-python-${{ inputs.python-version }}-deps-
-
-      # Step 4: Verify or install dependencies
-      - name: Verify dependencies or install
-        working-directory: ${{ inputs.working-directory }}
+      # Step 2: VERIFY VIRTUAL ENVIRONMENT
+      - name: Verify virtual environment
         run: |
-          echo "🔧 BUILD PHASE"
-          echo "============="
-          echo "This step VERIFIES that all previous steps succeeded."
-          echo "It will FAIL if dependencies are not properly installed."
-          echo ""
+          echo "🔍 VERIFYING VIRTUAL ENVIRONMENT"
+          echo "================================"
           
-          # CRITICAL: Se dependencies-installed é true, DEVE ter tudo instalado
-          if [ "${{ inputs.dependencies-installed }}" = "true" ]; then  # ⬅️ Já está correto
-            echo "✅ setup-environment executed successfully"
-            echo "Checking if ALL required packages are installed..."
-            
-            # Lista de pacotes ESSENCIAIS que DEVERIAM estar instalados
-            ESSENTIAL_PACKAGES="Flask flask-sqlalchemy pymysql flask-login setuptools"
-            MISSING_PACKAGES=0
-            
-            for pkg in $ESSENTIAL_PACKAGES; do
-              if pip show "$pkg" >/dev/null 2>&1; then
-                version=$(pip show "$pkg" | grep "^Version:" | cut -d: -f2 | xargs)
-                echo "  ✅ $pkg==$version"
-              else
-                echo "  ❌ $pkg - NOT INSTALLED"
-                echo "     This indicates setup-environment FAILED!"
-                MISSING_PACKAGES=$((MISSING_PACKAGES + 1))
-              fi
-            done
-            
-            echo ""
-            if [ $MISSING_PACKAGES -gt 0 ]; then
-              echo "💀 BUILD VERIFICATION FAILED!"
-              echo "   $MISSING_PACKAGES essential packages are MISSING"
-              echo "   Previous step (setup-environment) should have installed them"
-              echo "   Check setup-environment logs for errors"
-              exit 1
-            else
-              echo "✅ ALL essential packages are installed"
-              echo "✅ Previous pipeline steps succeeded"
-            fi
-          
-          else
-            echo "⚠️ dependencies-installed is ${{ inputs.dependencies-installed }}"
-            echo "This build job requires setup-environment to run first"
-            echo "Please run via pipeline.yaml with dependencies-installed: true"
+          # Verificar se o venv existe
+          if [ ! -d "$VENV_PATH" ]; then
+            echo "❌ ERROR: Virtual environment not found at: $VENV_PATH"
+            echo "This indicates setup-environment failed!"
             exit 1
           fi
-
-      - name: Verify Flask application
-        working-directory: ${{ inputs.working-directory }}
-        env:
-          PYTHONPATH: "${{ inputs.working-directory }}:${{ github.workspace }}"
-        run: |
-          echo "🔍 Final Flask application verification..."
-          echo "Working directory: $(pwd)"
-          echo "PYTHONPATH: $PYTHONPATH"
-          echo ""
           
-          python3 << 'EOF'
+          # Verificar se Python existe no venv
+          if [ ! -f "$VENV_PYTHON" ]; then
+            echo "❌ ERROR: Python not found in venv: $VENV_PYTHON"
+            echo "This indicates setup-environment failed!"
+            exit 1
+          fi
+          
+          echo "✅ Virtual environment verified:"
+          echo "   Path: $VENV_PATH"
+          echo "   Python: $VENV_PYTHON"
+          echo "   Version: $($VENV_PYTHON --version)"
+          
+          # Verificar tamanho do venv
+          echo -n "   Size: "
+          du -sh "$VENV_PATH" 2>/dev/null || echo "unknown"
+
+      # Step 3: VERIFY DEPENDENCIES IN VENV
+      - name: Verify dependencies in venv
+        run: |
+          echo "📦 VERIFYING DEPENDENCIES IN VENV"
+          echo "================================"
+          
+          # Lista de pacotes ESSENCIAIS que DEVERIAM estar no venv
+          ESSENTIAL_PACKAGES="Flask flask-sqlalchemy pymysql flask-login setuptools"
+          MISSING_PACKAGES=0
+          
+          echo "Checking essential packages in venv..."
+          
+          for pkg in $ESSENTIAL_PACKAGES; do
+            if $VENV_PIP show "$pkg" >/dev/null 2>&1; then
+              version=$($VENV_PIP show "$pkg" | grep "^Version:" | cut -d: -f2 | xargs)
+              echo "  ✅ $pkg==$version"
+            else
+              echo "  ❌ $pkg - NOT INSTALLED IN VENV"
+              echo "     This indicates setup-environment FAILED!"
+              MISSING_PACKAGES=$((MISSING_PACKAGES + 1))
+            fi
+          done
+          
+          echo ""
+          if [ $MISSING_PACKAGES -gt 0 ]; then
+            echo "💀 BUILD VERIFICATION FAILED!"
+            echo "   $MISSING_PACKAGES essential packages are MISSING from venv"
+            echo "   setup-environment should have installed them"
+            exit 1
+          else
+            echo "✅ ALL essential packages are installed in venv"
+            echo "✅ Virtual environment is properly configured"
+          fi
+          
+          # Listar todos os pacotes do venv
+          echo ""
+          echo "📊 All packages in venv:"
+          $VENV_PIP list | grep -E "(Flask|Werkzeug|SQLAlchemy|mysql)" || true
+
+      # Step 4: VERIFY FLASK APPLICATION IN VENV
+      - name: Verify Flask application in venv
+        run: |
+          echo "🔍 VERIFYING FLASK APPLICATION IN VENV"
+          echo "====================================="
+          
+          # Ir para o diretório do projeto
+          echo "📂 Changing to project directory: $PROJECT_ROOT"
+          cd "$PROJECT_ROOT"
+          echo "Working directory: $(pwd)"
+          
+          # Verificar estrutura do projeto
+          echo ""
+          echo "📁 Project structure:"
+          find . -name "*.py" | head -15 || true
+          
+          # Executar verificação usando Python do venv
+          echo ""
+          echo "🧪 Running Flask application verification..."
+          
+          $VENV_PYTHON << 'EOF'
           import sys
           import os
           
-          print("🔧 FINAL APPLICATION VERIFICATION")
+          print("🔧 FLASK APPLICATION VERIFICATION")
           print("=" * 40)
+          print(f"Python: {sys.executable}")
+          print(f"Python version: {sys.version}")
+          print(f"Working directory: {os.getcwd()}")
+          print(f"Python path: {sys.path[:3]}")
           
           try:
-              # Importa a aplicação
-              from main.app import create_app
-              print("✅ Successfully imported create_app from main.app")
+              # Adicionar diretório atual ao path
+              sys.path.insert(0, os.getcwd())
               
-              # Cria app em modo testing
+              # Importar e criar app
+              print("\n1️⃣ Importing Flask application...")
+              from app import create_app
+              print("✅ Successfully imported create_app from app")
+              
+              print("\n2️⃣ Creating Flask application...")
               app = create_app('testing')
               print(f"✅ Flask app created: {app.name}")
               
-              # Verificação básica
-              print(f"\n📋 Basic app info:")
+              # Informações do app
+              print(f"\n📋 Application info:")
               print(f"   Testing mode: {app.config.get('TESTING', False)}")
               print(f"   Debug mode: {app.config.get('DEBUG', False)}")
               print(f"   Config keys: {len(app.config)}")
+              print(f"   Secret key set: {'YES' if app.config.get('SECRET_KEY') else 'NO'}")
               
-              # Verifica se app tem configuração básica
-              if not app.config.get('SECRET_KEY'):
-                  print("⚠️ WARNING: SECRET_KEY not set (might be expected in testing)")
-              
-              # Verifica se app tem rotas definidas
-              print(f"\n🌐 Checking app routes...")
+              # Verificar rotas
+              print(f"\n🌐 Application routes:")
               routes = list(app.url_map.iter_rules())
-              print(f"   Found {len(routes)} routes")
+              print(f"   Total routes: {len(routes)}")
               
               if routes:
-                  # Testa a primeira rota não interna
-                  for route in routes:
+                  for i, route in enumerate(routes[:5]):  # Mostrar primeiras 5 rotas
                       if not route.rule.startswith('/_') and len(route.rule) > 1:
-                          print(f"   Sample route: {route.rule}")
-                          break
+                          methods = ','.join(route.methods)
+                          print(f"   {i+1}. {route.rule} [{methods}]")
+              
+              # Testar cliente
+              print("\n🧪 Testing with test client...")
+              with app.test_client() as client:
+                  # Tentar algumas rotas comuns
+                  test_endpoints = ['/', '/login', '/api/health']
                   
-                  # Testa se app pode responder
-                  print("\n🧪 Testing app response capability...")
-                  with app.test_client() as client:
-                      # Tenta acessar uma rota existente ou verifica app health
-                      response = client.get('/')
-                      print(f"   Root endpoint status: {response.status_code}")
-                      
-                      # Se 404, pode ser normal (app pode não ter rota raiz)
-                      if response.status_code != 404:
-                          print(f"✅ App responds with status {response.status_code}")
-                      else:
-                          print("ℹ️ Root endpoint returns 404 (might be expected)")
-                          
-                      # Verifica estrutura básica do app
-                      print(f"\n✅ App verification passed")
-              else:
-                  print("⚠️ WARNING: No routes defined in application")
+                  for endpoint in test_endpoints:
+                      try:
+                          response = client.get(endpoint)
+                          print(f"   {endpoint}: HTTP {response.status_code}")
+                      except Exception:
+                          print(f"   {endpoint}: Not accessible (might be expected)")
+              
+              # Verificação final
+              print("\n" + "=" * 40)
+              print("🎉 APPLICATION VERIFICATION PASSED!")
+              print("✅ All imports work")
+              print("✅ App can be instantiated")
+              print("✅ App structure is valid")
+              print("✅ Routes are configured")
               
           except ImportError as e:
               print(f"\n❌ IMPORT ERROR: {e}")
-              print("This should have been caught by setup-environment!")
+              print("This means the app structure has issues!")
+              print(f"Current directory: {os.getcwd()}")
+              print(f"Looking for: {__file__}")
               sys.exit(1)
           except Exception as e:
               print(f"\n❌ APPLICATION ERROR: {type(e).__name__}: {e}")
@@ -183,13 +209,8 @@ jobs:
               traceback.print_exc()
               sys.exit(1)
           
-          print("\n" + "=" * 40)
-          print("🎉 BUILD VERIFICATION PASSED!")
-          print("✅ Application imports work")
-          print("✅ App can be instantiated")
-          print("✅ App structure is valid")
-          print("")
-          print("🚀 APPLICATION IS READY FOR DEPLOYMENT")
+          print("\n🚀 APPLICATION IS READY FOR DEPLOYMENT")
           EOF
           
-          echo "✅ Final verification completed successfully"
+          echo ""
+          echo "✅ Flask application verification completed successfully"

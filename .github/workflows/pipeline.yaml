@@ -1,5 +1,5 @@
 # ============================================================
-# PIPELINE ORCHESTRATOR (NO SMOKE TEST)
+# PIPELINE ORCHESTRATOR
 # ============================================================
 name: Pipeline Orchestrator
 
@@ -29,21 +29,19 @@ jobs:
     uses: ./.github/workflows/sast.yaml
     needs: setup-environment
     with:
-      python-version: ${{ needs.setup-environment.outputs.python-version }}
-      working-directory: "flask_app/src"
+      project-root: ${{ needs.setup-environment.outputs.project-root }}
+      venv-path: ${{ needs.setup-environment.outputs.venv-path }}
+      python-path: ${{ needs.setup-environment.outputs.python-path }}
       fail-on-issues: "false"
-      dependencies-installed: ${{ needs.setup-environment.outputs.dependencies-installed }}
-      cache-key: ${{ needs.setup-environment.outputs.cache-key }}
 
   # PHASE 2: BUILD APPLICATION
   build-app:
     uses: ./.github/workflows/build-app.yaml
     needs: [setup-environment, security-sast] 
     with:
-      python-version: ${{ needs.setup-environment.outputs.python-version }}
-      working-directory: "flask_app/src"
-      dependencies-installed: ${{ needs.setup-environment.outputs.dependencies-installed }}
-      cache-key: ${{ needs.setup-environment.outputs.cache-key }}
+      project-root: ${{ needs.setup-environment.outputs.project-root }}
+      venv-path: ${{ needs.setup-environment.outputs.venv-path }}
+      python-path: ${{ needs.setup-environment.outputs.python-path }}
 
   # PHASE 3: PIPELINE SUMMARY
   pipeline-summary:
@@ -61,16 +59,17 @@ jobs:
           echo "Job Results:"
           echo "------------"
           echo "Setup Environment.: ${{ needs.setup-environment.result }}"
-          echo "Security Scan.....: ${{ needs.security-sast.result }}"  # ⬅️ REMOVE smoke-test line
+          echo "Security Scan.....: ${{ needs.security-sast.result }}"
           echo "Build.............: ${{ needs.build-app.result }}"
           echo ""
           echo "Cache Status......: ${{ needs.setup-environment.outputs.cache-hit }}"
           echo "Requirements Hash.: ${{ needs.setup-environment.outputs.requirements-hash }}"
           echo "Deps Installed....: ${{ needs.setup-environment.outputs.dependencies-installed }}"
+          echo "Project Root......: ${{ needs.setup-environment.outputs.project-root }}"
           echo ""
           
           # Determine overall status
-          if [[ "${{ needs.security-sast.result }}" == "success" &&  # ⬅️ CHANGE to security-sast
+          if [[ "${{ needs.security-sast.result }}" == "success" &&
                 "${{ needs.build-app.result }}" == "success" ]]; then
             echo "✅ ALL CRITICAL JOBS PASSED!"
             echo "✅ Application is ready for deployment"
