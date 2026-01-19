@@ -176,5 +176,5 @@ def _create_test_data():
     )
     db.session.add(park1)
     db.session.add(park2)
-
+    
     db.session.commit()
