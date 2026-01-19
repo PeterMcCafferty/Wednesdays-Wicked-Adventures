@@ -146,8 +146,8 @@ jobs:
           find . -name "*test*.py" -type f | head -10 || echo "No tests found"
           echo ""
           
-          # 3. Run pytest
           echo "🚀 Running pytest..."
+          cd "${{ github.workspace }}/flask_app/src"
           python -m pytest tests/ -v --cov=app --cov-report=term-missing
           
           echo ""
