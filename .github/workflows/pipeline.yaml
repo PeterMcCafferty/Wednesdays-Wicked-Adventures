@@ -194,7 +194,7 @@ jobs:
           cd wednesdays-wicked-adventures-1.0.dev0
           echo ""
           ls -l 
-          # unzip -l dist/wednesdays-wicked-adventures-1.0.dev0-py3-none-any.whl | grep /
+          unzip -l dist/wednesdays-wicked-adventures-1.0.dev0-py3-none-any.whl | grep /
           echo "" 
       
       # ======================================================
