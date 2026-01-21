@@ -173,6 +173,7 @@ jobs:
           # 2. Install build & lint tools
           echo "Installing build tools..."
           python -m pip install build flake8
+          echo ""
 
           # 3. Run flake8 
           echo "Running flake8..."
@@ -181,7 +182,7 @@ jobs:
 
           # 4. Build Python package
           echo "Building Python package..."
-          python build
+          python -m build
 
           echo "Build artifacts created in dist/"
       
