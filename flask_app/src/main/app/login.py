@@ -54,6 +54,10 @@ def register_post():
     last_name = request.form.get('last_name')
     password = request.form.get('password')
 
+    if not email or not name or not last_name or not password:
+        flash('All fields are required!')
+        return redirect(url_for('login.register'))
+
     user = User.query.filter_by(email=email).first() 
     if user: 
         flash('This email address already exists! Please try again!')
