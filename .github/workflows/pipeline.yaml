@@ -208,6 +208,7 @@ jobs:
             echo "PIPELINE COMPLETED SUCCESSFULLY!"
             echo "Environment configured correctly"
             echo "Tests executed"
+            echo "Build completed"
             echo "Ready for next steps"
           else
             echo "Some phases failed"
