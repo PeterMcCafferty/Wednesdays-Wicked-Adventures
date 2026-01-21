@@ -181,12 +181,16 @@ jobs:
           echo "Running flake8..."
           cd ../
           flake8 main/app --statistics --count || true
+          echo ""
 
           # 4. Build Python package
           echo "Building Python package..."
           pyb
-
+          echo ""
           echo "Build artifacts created in dist/"
+          echo "Current working directory: $(pwd)"
+          ls -l
+          echo ""     
       
       # ======================================================
       # PHASE 4: PIPELINE SUMMARY
