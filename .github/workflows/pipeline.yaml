@@ -1,77 +1,94 @@
 # ============================================================
 # PIPELINE
 # ============================================================
-name: CI/CD Pipeline 
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: [UAT, feature/*]
+    branches: [feature/*]
   pull_request:
     branches: [main]
   workflow_dispatch:
 
+env:
+  DOCKER_IMAGE_NAME: wicked-adventures
+  REGISTRY: docker.io
+
 jobs:
+  # ============================================================
+  # JOB 1: BUILD AND TEST
+  # ============================================================
   ci-pipeline:
     name: CI/CD Pipeline
     runs-on: ubuntu-latest
-    timeout-minutes: 15 
-    
+    timeout-minutes: 15
+    env:
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+      FLASK_ENV: development
+
     steps:
       # ======================================================
-      # STEP 0: CHECKOUT CODE
+      # STEP 1: CHECKOUT CODE
       # ======================================================
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+        with:
+          fetch-depth: 0 # Shallow clones disabled for SonarCloud
+
       # ======================================================
-      # STEP 1: SETUP PYTHON
+      # STEP 2: SETUP PYTHON
       # ======================================================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      
+
       # ======================================================
-      # PHASE 0: SETUP ENVIRONMENT (EXACTLY AS LOCAL)
+      # PHASE 3: SETUP ENVIRONMENT
       # ======================================================
       - name: Setup Virtual Environment
         id: setup-phase
         run: |
-          echo "PHASE 0: SETUP ENVIRONMENT"
+          echo "PHASE 3: SETUP ENVIRONMENT"
           echo "============================="
+          echo ""
+          echo "Checking environment variables..."
+          echo "SECRET_KEY is set: ${{ env.SECRET_KEY != '' }}"
+          echo "SEED_ADMIN_PASSWORD is set: ${{ env.SEED_ADMIN_PASSWORD != '' }}"
           echo ""
           echo "Going to: flask_app/src/main"
           cd flask_app/src/main
           echo "Current directory: $(pwd)"
           echo ""
-          
-          # 1. Create venv (exactly as you do locally)
+
+          # Create venv 
           echo "Creating virtual environment..."
           python3 -m venv venv
-          echo "✅ Venv created at: $(pwd)/venv"
+          echo "Venv created at: $(pwd)/venv"
           echo ""
-          
-          # 2. Activate venv
+
+          # Activate venv
           echo "Activating venv..."
           source venv/bin/activate
-          echo "✅ Venv activated"
-          echo "   Python: $(which python)"
-          echo "   Version: $(python --version)"
+          echo "Venv activated"
+          echo "Python: $(which python)"
+          echo "Version: $(python --version)"
           echo ""
-          
-          # 3. Update pip
+
+          # Update pip
           echo "Upgrading pip..."
           python -m pip install --upgrade pip
           echo ""
-          
-          # 4. Install requirements (one level up)
+
+          # Install requirements 
           echo "Installing requirements.txt..."
           echo "From: ../requirements.txt"
           pip install -r ../requirements.txt
           echo "Requirements installed"
           echo ""
-          
-          # 5. Install extra packages (pytest is already in requirements)
+
+          # Install extra packages 
           echo "Checking pytest..."
           if ! pip show pytest >/dev/null 2>&1; then
             echo "Installing pytest..."
@@ -79,109 +96,915 @@ jobs:
           fi
           echo "Pytest available"
           echo ""
-          
-          # 6. Basic verification only
-          echo "Basic verification..."
+
+          # Show pytest
+          echo "Showing pytest..."
           pip show Flask pytest | grep -E "^(Name|Version):" || true
           echo ""
-          
+
           echo "SETUP COMPLETED SUCCESSFULLY"
-      
+
       # ======================================================
-      # PHASE 1: SECURITY SCAN (SAST) - BANDIT
+      # PHASE 4: CODE QUALITY - FLAKE8 LINTING
       # ======================================================
-      - name: Security Scan (SAST)
-        id: security-phase
+      - name: Code Quality - Flake8 Linting
+        id: lint-phase
         run: |
-          echo "PHASE 1: SECURITY SCAN"
-          echo "========================="
-          echo ""
-          
-          # 1. Activate venv and go to project
+          echo "PHASE 4: CODE QUALITY - FLAKE8"
+          echo "================================"
+
+          # Activate venv and go to project
           echo "Activating venv..."
           cd flask_app/src/main
           source venv/bin/activate
           echo "Directory: $(pwd)"
           echo ""
-          
-          # 2. Install bandit if needed
+
+          echo "Flake8 version: $(flake8 --version)"
+
+          echo "Running critical error checks..."
+          flake8 . \
+            --count \
+            --select=E9,F63,F7,F82 \
+            --show-source \
+            --statistics \
+            --exclude=venv,__pycache__,.git,.pytest_cache
+
+          echo "Running extended style checks..."
+          flake8 . \
+            --count \
+            --max-complexity=10 \
+            --max-line-length=127 \
+            --statistics \
+            --exclude=venv,__pycache__,.git,.pytest_cache,*.pyc,*.egg-info \
+            --format='%(path)s:%(row)d:%(col)d: %(code)s %(text)s' || {
+              echo ""
+              echo "Style warnings found (not blocking pipeline)"
+          }
+
+          echo "FLAKE8 LINTING COMPLETED"
+
+      # ======================================================
+      # PHASE 5: SECURITY SCAN (SAST) - BANDIT
+      # ======================================================
+      - name: Security Scan (SAST)
+        id: security-phase
+        run: |
+          echo "PHASE 5: SECURITY SCAN"
+          echo "========================="
+          echo ""
+
+          # Activate venv and go to project
+          echo "Activating venv..."
+          cd flask_app/src/main
+          source venv/bin/activate
+          echo "Directory: $(pwd)"
+          echo ""
+
+          # Install bandit if needed
           echo "Checking bandit..."
           if ! pip show bandit >/dev/null 2>&1; then
             echo "Installing bandit..."
             pip install bandit
           fi
-          echo "✅ Bandit available"
+          echo "Bandit available"
           echo ""
-          
-          # 3. Run quick scan (optional - can skip if you want)
-          echo "Running quick security scan..."
-          bandit -r . -f json -o bandit-results.json || echo "⚠️ Scan failed, continuing..."
-          
-          if [ -f "bandit-results.json" ]; then
-            echo "Scan result saved in bandit-results.json"
+
+          # Create reports directory
+          echo "Creating reports directory..."
+          cd ..
+          mkdir -p Bandit
+
+          # Run scan
+          echo "Running security scan on all Python files..."
+          bandit -r ./main/app \
+            --skip B101 \
+            -f json \
+            -o Bandit/bandit-results.json
+
+          # Show summary
+          echo ""
+          echo "Scan completed. Reports saved in Bandit/"
+          echo ""
+
+          if [ -f "Bandit/bandit-results.json" ]; then
+            echo "Summary of findings:"
+            python -c "
+          import json
+          with open('Bandit/bandit-results.json') as f:
+            data = json.load(f)
+          print(f'Total files scanned: {data[\"metrics\"][\"_totals\"][\"loc\"]}')
+          print(f'Total issues found: {len(data[\"results\"])}')
+          print(f'High severity: {len([r for r in data[\"results\"] if r[\"issue_severity\"] == \"HIGH\"])}')
+          print(f'Medium severity: {len([r for r in data[\"results\"] if r[\"issue_severity\"] == \"MEDIUM\"])}')
+          print(f'Low severity: {len([r for r in data[\"results\"] if r[\"issue_severity\"] == \"LOW\"])}')
+            "
           fi
-          echo ""
-          echo "✅ SECURITY PHASE COMPLETED"
-      
+
+          echo "SECURITY PHASE COMPLETED"
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-reports
+          path: flask_app/src/Bandit/
+
       # ======================================================
-      # PHASE 2: RUN TESTS WITH pytest
+      # PHASE 6: RUN SMOKE TESTS (NEW)
       # ======================================================
-      - name: Run Tests with pytest
-        id: test-phase
+      - name: Run Smoke Tests
+        id: smoke-phase
         run: |
-          echo "PHASE 2: RUN TESTS"
-          echo "====================="
+          echo "PHASE 6: RUN SMOKE TESTS"
+          echo "=========================="
           echo ""
-          
-          # 1. Activate venv and go to project
+
+          # Activate venv and go to project
           echo "Activating venv..."
           cd flask_app/src/main
           source venv/bin/activate
           echo "Directory: $(pwd)"
           echo "Python: $(which python)"
           echo ""
-          
-          # 2. Check test structure
+
+          # Navigate to src directory for pytest
+          cd "${{ github.workspace }}/flask_app/src"
+          echo "Running from: $(pwd)"
+          echo ""
+
+          # Verify test structure
+          echo "Checking smoke test structure..."
+          if [ -d "tests/smoke" ] && [ -f "tests/smoke/test_smoke.py" ]; then
+            echo "✓ Smoke tests found"
+          else
+            echo "⚠ Warning: tests/smoke/test_smoke.py not found"
+          fi
+          echo ""
+
+          # Run smoke tests
+          echo "Running smoke tests..."
+          python -m pytest tests/smoke/ \
+            -v \
+            --tb=short \
+            --color=yes
+
+          echo ""
+          echo "SMOKE TESTS COMPLETED SUCCESSFULLY"
+
+      # ======================================================
+      # PHASE 7: RUN TESTS WITH PYTEST
+      # ======================================================
+      - name: Run Tests with pytest
+        id: test-phase
+        run: |
+          echo "PHASE 7: RUN TESTS"
+          echo "====================="
+          echo ""
+
+          # Activate venv and go to project
+          echo "Activating venv..."
+          cd flask_app/src/main
+          source venv/bin/activate
+          echo "Directory: $(pwd)"
+          echo "Python: $(which python)"
+          echo ""
+
+          # Check test structure
           echo "Test structure:"
           find . -name "*test*.py" -type f | head -10 || echo "No tests found"
           echo ""
-          
+
           echo "Running pytest..."
           cd "${{ github.workspace }}/flask_app/src"
-          python -m pytest tests/ -v --cov=app --cov-report=term-missing
-          
+          python -m pytest --cov=app --cov-report=xml --cov-report=term-missing
+
           echo ""
-          echo "✅ TESTS EXECUTED SUCCESSFULLY"
-      
+          echo "TESTS EXECUTED SUCCESSFULLY"
+
       # ======================================================
-      # PHASE 3: PIPELINE SUMMARY
+      # PHASE 8: SONARCLOUD ANALYSIS
+      # ======================================================
+      - name: SonarCloud Scan
+        id: sonar-phase
+        uses: SonarSource/sonarqube-scan-action@v5.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          projectBaseDir: flask_app/src
+          args: >
+            -Dsonar.projectKey=AndreaRoss96_Wednesdays-Wicked-Adventures
+            -Dsonar.organization=andreaross96
+            -Dsonar.verbose=true
+            -Dsonar.qualitygate.wait=false
+            -Dsonar.scm.disabled=true
+
+      # ======================================================
+      # PHASE 9: PIPELINE SUMMARY
       # ======================================================
       - name: Pipeline Summary
         if: always()
         run: |
-          echo "PHASE 3: PIPELINE SUMMARY"
+          echo "PHASE 9: PIPELINE SUMMARY"
           echo "============================"
           echo ""
           echo "Results:"
           echo "--------"
           echo "Setup Environment....: ${{ steps.setup-phase.conclusion || 'unknown' }}"
+          echo "Flake8 Linting.......: ${{ steps.lint-phase.conclusion || 'unknown' }}"
           echo "Security Scan........: ${{ steps.security-phase.conclusion || 'unknown' }}"
           echo "Test Execution.......: ${{ steps.test-phase.conclusion || 'unknown' }}"
           echo ""
           echo "Overall Status.......: ${{ job.status }}"
           echo ""
-          
+
           if [ "${{ job.status }}" = "success" ]; then
-            echo "✅ PIPELINE COMPLETED SUCCESSFULLY!"
-            echo "✅ Environment configured correctly"
-            echo "✅ Tests executed"
-            echo "✅ Ready for next steps"
+            echo "PIPELINE COMPLETED SUCCESSFULLY!"
+            echo "Environment configured correctly"
+            echo "Tests executed"
+            echo "Build completed"
+            echo "Ready for next steps"
           else
-            echo "⚠️ Some phases failed"
+            echo "Some phases failed"
             echo "Check logs for details"
           fi
-          
+
           echo ""
           echo "========================================"
           echo "PIPELINE EXECUTION COMPLETE"
           echo "========================================"
+
+  # ============================================================
+  # JOB 2: DOCKER BUILD, TEST & PUSH
+  # ============================================================
+  docker-build:
+    name: Docker Build, Test & Push
+    runs-on: ubuntu-latest
+    needs: ci-pipeline # runs after CI pipeline succeeds
+    timeout-minutes: 15
+    env:
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+      FLASK_ENV: development
+
+    steps:
+      # ======================================================
+      # STEP 1: CHECKOUT CODE
+      # ======================================================
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ======================================================
+      # STEP 2: SETUP DOCKER
+      # ======================================================
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ======================================================
+      # STEP 3: LOG IN TO DOCKER HUB
+      # ======================================================
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      # ======================================================
+      # PHASE 1: BUILD DOCKER IMAGE
+      # ======================================================
+      - name: Build Docker Image
+        id: build-phase
+        run: |
+          echo "PHASE 1: BUILD DOCKER IMAGE"
+          echo "============================"
+          echo ""
+
+          # Go to the directory with Dockerfile
+          cd flask_app/src
+          echo "Current directory: $(pwd)"
+          echo ""
+
+          # Verify required files exist
+          echo "Verifying build files..."
+          if [ ! -f "Dockerfile" ]; then
+            echo "ERROR: Dockerfile not found!"
+            exit 1
+          fi
+          if [ ! -f "setup.py" ]; then
+            echo "ERROR: setup.py not found!"
+            exit 1
+          fi
+          if [ ! -f "MANIFEST.in" ]; then
+            echo "ERROR: MANIFEST.in not found!"
+            exit 1
+          fi
+          if [ ! -f "requirements.txt" ]; then
+            echo "ERROR: requirements.txt not found!"
+            exit 1
+          fi
+          echo "All required files are present!"
+          echo ""
+
+          # Build Docker Image
+          echo "Building Docker image..."
+          docker build -t wicked-adventures:latest .
+          echo "Docker image built successfully"
+          echo ""
+
+          # Verify the image was created
+          echo "Verifying Docker image..."
+          docker images | grep wicked-adventures
+          echo ""
+
+          # Get image details
+          echo "Image details:"
+          docker images wicked-adventures:latest --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}"
+          echo ""
+
+          # Test the image - basic import test
+          echo "Testing basic import..."
+          docker run --rm wicked-adventures:latest python -c "import app; print('App imports successfully')"
+          echo ""
+
+          echo "DOCKER BUILD COMPLETED SUCCESSFULLY"
+
+      # ======================================================
+      # PHASE 2: TRIVY VULNERABILITY SCAN
+      # ======================================================
+      - name: Trivy Vulnerability Scan
+        id: trivy-phase
+        run: |
+          echo "PHASE 2: TRIVY VULNERABILITY SCAN"
+          echo "=================================="
+          echo ""
+
+          # install Trivy
+          echo "Installing Trivy..."
+          sudo apt-get update -y
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update -y
+          sudo apt-get install -y trivy
+          echo "Trivy installed successfully"
+          echo ""
+
+          # check Trivy installation
+          echo "Trivy version:"
+          trivy --version
+          echo ""
+
+          # create directory for report
+          mkdir -p trivy-reports
+          echo "Reports directory created: $(pwd)/trivy-reports"
+          echo ""
+
+          # run Trivy scan - Table format 
+          echo "Running Trivy vulnerability scan (Table format)..."
+          trivy image \
+            --severity HIGH,CRITICAL \
+            --format table \
+            --output trivy-reports/trivy-report.txt \
+            wicked-adventures:latest
+          echo ""
+
+          # run Trivy scan - JSON format 
+          echo "Running Trivy vulnerability scan (JSON format)..."
+          trivy image \
+            --severity HIGH,CRITICAL \
+            --format json \
+            --output trivy-reports/trivy-report.json \
+            wicked-adventures:latest
+          echo ""
+
+          # Display scan results
+          echo "Trivy scan complete!"
+          echo ""
+          echo "=========================================="
+          echo "SCAN RESULTS SUMMARY"
+          echo "=========================================="
+          cat trivy-reports/trivy-report.txt
+          echo ""
+
+          # Parse JSON and show counts
+          if [ -f "trivy-reports/trivy-report.json" ]; then
+            echo "Vulnerability counts:"
+            python3 << 'PYEOF'
+          import json
+
+          with open('trivy-reports/trivy-report.json', 'r') as f:
+              data = json.load(f)
+
+          critical_count = 0
+          high_count = 0
+
+          if 'Results' in data:
+              for result in data['Results']:
+                  if 'Vulnerabilities' in result:
+                      for vuln in result['Vulnerabilities']:
+                          severity = vuln.get('Severity', '')
+                          if severity == 'CRITICAL':
+                              critical_count += 1
+                          elif severity == 'HIGH':
+                              high_count += 1
+
+          print(f"CRITICAL: {critical_count}")
+          print(f"HIGH:     {high_count}")
+          print(f"TOTAL:    {critical_count + high_count}")
+
+          if critical_count > 0:
+              print("")
+              print(f"WARNING: {critical_count} CRITICAL vulnerabilities found!")
+          if high_count > 0:
+              print(f"WARNING: {high_count} HIGH vulnerabilities found!")
+
+          if critical_count == 0 and high_count == 0:
+              print("")
+              print("No HIGH or CRITICAL vulnerabilities found!")
+          PYEOF
+          fi
+
+          echo ""
+          echo "TRIVY SCAN COMPLETED"
+
+      # ======================================================
+      # PHASE 3: UPLOAD TRIVY REPORTS
+      # ======================================================
+      - name: Upload Trivy Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-reports
+          path: trivy-reports/
+          retention-days: 7
+
+      # ======================================================
+      # PHASE 4: TEST DOCKER CONTAINER
+      # ======================================================
+      - name: Test Docker Container
+        id: test-phase
+        run: |
+          echo "PHASE 2: TEST DOCKER CONTAINER"
+          echo "==============================="
+          echo ""
+
+          # Run container with environment variables from secrets
+          echo "Starting Docker container with environment variables..."
+          docker run -d \
+            --name test-wicked \
+            -p 5000:5000 \
+            -e SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+            -e SEED_ADMIN_PASSWORD="${{ secrets.SEED_ADMIN_PASSWORD }}" \
+            -e FLASK_ENV="${{ env.FLASK_ENV }}" \
+            wicked-adventures:latest
+
+          echo "Container started"
+          echo "Container ID: $(docker ps -q -f name=test-wicked)"
+          echo ""
+
+          echo "wait for Flask to start..."
+          sleep 15  
+          echo ""
+
+          # check container status
+          echo "Container status:"
+          docker ps | grep test-wicked
+          echo ""
+
+          # check container logs
+          echo "Container logs:"
+          docker logs test-wicked --tail 20
+          echo ""
+
+          # verify container is running
+          if [ "$(docker ps -q -f name=test-wicked)" ]; then
+            echo "Container is running"
+          else
+            echo "Container is not running!"
+            docker logs test-wicked
+            exit 1
+          fi
+          echo ""
+
+          # test health endpoint 
+          echo "Testing container response..."
+          if curl -f http://localhost:5000/ --max-time 10 2>/dev/null; then
+            echo "Container is responding to HTTP requests"
+          else
+            echo "Container is not responding on root endpoint"
+            echo "Checking if Flask is running..."
+            docker exec test-wicked ps aux | grep flask || echo "Flask process check"
+          fi
+          echo ""
+
+          # get container stats
+          echo "Container resource usage:"
+          docker stats test-wicked --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}"
+          echo ""
+
+          echo "DOCKER CONTAINER TESTING COMPLETED"
+
+      # ======================================================
+      # PHASE 5: DAST SECURITY SCAN WITH NUCLEI
+      # ======================================================
+      - name: DAST Security Scan (Nuclei)
+        id: dast-phase
+        run: |
+          #!/usr/bin/env bash
+          echo "PHASE 3: DAST SECURITY SCAN"
+          echo "=============================="
+          echo ""
+              
+          # Create reports directory
+          echo "Creating DAST reports directory..."
+          mkdir -p dast-reports
+          echo "Reports will be saved in: $(pwd)/dast-reports"
+          echo ""            
+          # URL Target
+          TARGET_URL="http://localhost:5000"
+          echo "Target URL: $TARGET_URL"
+          echo ""
+              
+          # Verify application is responding before scanning
+          echo "Checking application response..."
+          RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$TARGET_URL" --max-time 10 || echo "000")
+          echo "HTTP Response Code: $RESPONSE_CODE"
+              
+          if [ "$RESPONSE_CODE" != "200" ]; then
+            echo "Warning: Application returned code $RESPONSE_CODE"
+            echo "Continuing scan anyway..."
+          fi
+          echo ""
+              
+          # Pull Nuclei Docker image
+          echo "Pulling Nuclei Docker image..."
+          docker pull projectdiscovery/nuclei:latest
+          echo ""
+              
+          # SCAN 1: Verify critical vulnerabilities
+          echo "1. Quick Critical Scan (timeout: 90s)"
+          echo "-------------------------------------"
+          docker run --rm \
+            -v $(pwd)/dast-reports:/reports \
+            projectdiscovery/nuclei:latest \
+            -u "$TARGET_URL" \
+            -t http/security-misconfiguration/ \
+            -t http/missing-headers/ \
+              -severity critical \
+            -timeout 90 \
+            -json -o /reports/critical-scan.json \
+            -silent || true
+              
+          # SCAN 2: Security Headers Scan (important for web apps)
+          echo ""
+          echo "2. Security Headers Scan"
+          echo "-------------------------"
+          docker run --rm \
+            -v $(pwd)/dast-reports:/reports \
+            projectdiscovery/nuclei:latest \
+            -u "$TARGET_URL" \
+            -t http/missing-headers/ \
+            -severity medium,high \
+            -timeout 60 \
+            -json -o /reports/headers-scan.json \
+            -silent || true
+              
+          # SCAN 3: (admin, debug, etc)
+          echo ""
+          echo "3. Exposed Panels Scan"
+          echo "----------------------"
+          docker run --rm \
+            -v $(pwd)/dast-reports:/reports \
+            projectdiscovery/nuclei:latest \
+            -u "$TARGET_URL" \
+            -t http/exposed-panels/ \
+            -severity medium,high,critical \
+            -timeout 60 \
+            -json -o /reports/panels-scan.json \
+            -silent || true
+              
+          # Results report
+          echo ""
+          echo "Generating consolidated report..."
+          echo "================================="
+          cat > dast-reports/summary.txt << EOF
+
+          ========================================
+          DAST SECURITY SCAN SUMMARY
+          ========================================
+          Target: $TARGET_URL
+          Timestamp: $(date)
+          Scan duration: ~3 minutes
+          ========================================
+          EOF
+              
+          # Analising results and counting by severity
+              CRITICAL_COUNT=0
+              HIGH_COUNT=0
+              MEDIUM_COUNT=0
+              LOW_COUNT=0
+              
+              for scan_file in critical-scan.json headers-scan.json panels-scan.json; do
+                if [ -f "dast-reports/$scan_file" ] && [ -s "dast-reports/$scan_file" ]; then
+                  echo "" >> dast-reports/summary.txt
+                  echo "=== $(echo $scan_file | sed 's/-/ /g' | sed 's/.json//') ===" >> dast-reports/summary.txt
+                  
+                  # Counting severities
+                  if command -v jq > /dev/null; then
+                    while IFS= read -r severity; do
+                      case $severity in
+                        critical) CRITICAL_COUNT=$((CRITICAL_COUNT + 1)) ;;
+                        high) HIGH_COUNT=$((HIGH_COUNT + 1)) ;;
+                        medium) MEDIUM_COUNT=$((MEDIUM_COUNT + 1)) ;;
+                        low) LOW_COUNT=$((LOW_COUNT + 1)) ;;
+                      esac
+                    done < <(jq -r '.info.severity' "dast-reports/$scan_file" 2>/dev/null)
+                    
+                    # List findings
+                    jq -r '.[] | "\(.info.severity | ascii_upcase): \(.info.name)\n      Template: \(.template_id)\n      Matched: \(.matched)\n"' \
+                      "dast-reports/$scan_file" 2>/dev/null >> dast-reports/summary.txt || echo "No findings" >> dast-reports/summary.txt
+                  else
+                    echo "jq not available for parsing" >> dast-reports/summary.txt
+                  fi
+                fi
+              done
+              
+              # Add severity summary
+              echo "" >> dast-reports/summary.txt
+              echo "========================================" >> dast-reports/summary.txt
+              echo "SUMMARY BY SEVERITY" >> dast-reports/summary.txt
+              echo "========================================" >> dast-reports/summary.txt
+              echo "Critical: $CRITICAL_COUNT" >> dast-reports/summary.txt
+              echo "High:     $HIGH_COUNT" >> dast-reports/summary.txt
+              echo "Medium:   $MEDIUM_COUNT" >> dast-reports/summary.txt
+              echo "Low:      $LOW_COUNT" >> dast-reports/summary.txt
+              echo "========================================" >> dast-reports/summary.txt
+              
+              # Show summary in console
+              echo ""
+              tail -20 dast-reports/summary.txt
+              echo ""
+              
+              # Just warning
+              if [ "$CRITICAL_COUNT" -gt 0 ]; then
+                echo "WARNING: Found $CRITICAL_COUNT CRITICAL vulnerabilities!"
+                echo "These should be addressed immediately."
+              fi
+              
+              if [ "$HIGH_COUNT" -gt 0 ]; then
+                echo "WARNING: Found $HIGH_COUNT HIGH severity vulnerabilities"
+              fi
+              
+              if [ "$CRITICAL_COUNT" -eq 0 ] && [ "$HIGH_COUNT" -eq 0 ]; then
+                echo "No critical or high severity vulnerabilities found!"
+              fi
+              
+              echo ""
+              echo "Detailed report: dast-reports/summary.txt"
+              echo "DAST SCAN COMPLETED"
+
+      # ======================================================
+      # PHASE 6: UPLOAD DAST REPORTS
+      # ======================================================
+      - name: Upload DAST Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dast-reports
+          path: dast-reports/
+          retention-days: 7
+
+      # ======================================================
+      # PHASE 7: PUSH TESTED IMAGE TO DOCKER HUB
+      # ======================================================
+      - name: Push tested Docker image to Docker Hub
+        id: push-phase
+        run: |
+          echo "PHASE 7: PUSH TESTED IMAGE TO DOCKER HUB"
+          echo "=========================================="
+          echo ""
+
+          # Tag the already-tested image with Docker Hub repo names
+          echo "Tagging tested image for Docker Hub..."
+          docker tag wicked-adventures:latest ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+          docker tag wicked-adventures:latest ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
+          echo "✓ Images tagged"
+          echo ""
+
+          # Push latest tag
+          echo "Pushing image with 'latest' tag..."
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+          echo "✓ Latest tag pushed"
+          echo ""
+
+          # Push commit SHA tag
+          echo "Pushing image with commit SHA tag (${{ github.sha }})..."
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
+          echo "✓ Commit SHA tag pushed"
+          echo ""
+
+          # Verify images in Docker Hub
+          echo "Published images:"
+          echo "- ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest"
+          echo "- ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}"
+          echo ""
+
+          echo "PHASE 7 COMPLETED - TESTED IMAGE PUSHED SUCCESSFULLY"
+
+      # ======================================================
+      # PHASE 8: CLEANUP -> REPLACED BY DEPLOYEMENT JOB
+      # ======================================================
+
+      #      - name: Cleanup Docker Container
+      #        if: always()
+      #        run: |
+      #          echo "PHASE 5: CLEANUP"
+      #          echo "================"
+      #          echo ""
+      #
+      #          # stop and remove container
+      #          if [ "$(docker ps -q -f name=test-wicked)" ]; then
+      #            echo "Stopping container..."
+      #            docker stop test-wicked
+      #            echo "Container stopped"
+      #          fi
+      #
+      #          if [ "$(docker ps -aq -f name=test-wicked)" ]; then
+      #            echo "Removing container..."
+      #            docker rm test-wicked
+      #            echo "Container removed"
+      #          fi
+      #          echo ""
+      #
+      #          echo "CLEANUP COMPLETED"
+
+      # ======================================================
+      # PHASE 8: DOCKER JOB SUMMARY
+      # ======================================================
+      - name: Docker Job Summary
+        if: always()
+        run: |
+          echo "PHASE 8: DOCKER JOB SUMMARY"
+          echo "==========================="
+          echo ""
+          echo "Results:"
+          echo "--------"
+          echo "Docker Build.........: ${{ steps.build-phase.conclusion || 'unknown' }}"
+          echo "Trivy Scan...........: ${{ steps.trivy-phase.conclusion || 'unknown' }}"
+          echo "Container Test.......: ${{ steps.test-phase.conclusion || 'unknown' }}"
+          echo "DAST Security Scan...: ${{ steps.dast-phase.conclusion || 'unknown' }}"
+          echo "Push to Docker Hub...: ${{ steps.push-phase.conclusion || 'unknown' }}"
+          echo ""
+          echo "Overall Status.......: ${{ job.status }}"
+          echo ""
+
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "DOCKER JOB COMPLETED SUCCESSFULLY!"
+            echo "Docker image built"
+            echo "Trivy scan completed"
+            echo "Container tested with secrets"
+            echo "DAST scan completed"
+            echo "Image pushed to Docker Hub"
+            echo "Ready for deployment"
+          else
+            echo "Docker job failed"
+            echo "Image was NOT pushed to Docker Hub"
+          fi
+
+          echo ""
+          echo "========================================"
+          echo "DOCKER JOB EXECUTION COMPLETE"
+          echo "========================================"
+
+  # ============================================================
+  # JOB : DEPLOY TO EC2
+  # ============================================================
+  deploy:
+    name: deploy to EC2
+    runs-on: ubuntu-latest
+    needs: docker-build
+    timeout-minutes: 10
+    env:
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy-key.pem
+          chmod 600 ~/.ssh/deploy-key.pem
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Pull and run Docker image on EC2
+        run: |
+          # Expand variables BEFORE sending to SSH
+          IMAGE_NAME="${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}"
+
+          ssh -i ~/.ssh/deploy-key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << EOF
+          set -e
+
+          echo "========================================"
+          echo "Docker Deployment Started"
+          echo "========================================"
+          echo ""
+
+          # Set variables
+          IMAGE_NAME="$IMAGE_NAME"
+
+          echo "Image: \$IMAGE_NAME"
+          echo ""
+
+          # Log in to Docker Hub
+          echo "Logging in to Docker Hub..."
+          docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" -p "${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}"
+          echo ""
+
+          # Pull latest image
+          echo "Pulling latest Docker image..."
+          docker pull \$IMAGE_NAME:latest
+          echo "✓ Image pulled successfully"
+          echo ""
+
+          # Get image digest (last 12 characters of SHA256)
+          echo "Extracting image digest..."
+          IMAGE_DIGEST=\$(docker inspect \$IMAGE_NAME:latest --format='{{index .RepoDigests 0}}' | sed 's/.*sha256:\([a-f0-9]*\).*/\1/' | cut -c1-12)
+          CONTAINER_NAME="wicked-adventures-\${IMAGE_DIGEST}"
+          echo "Container name: \$CONTAINER_NAME"
+          echo ""
+
+          # Stop and remove old wicked-adventures containers (keep only running one)
+          echo "Cleaning up old containers..."
+          docker ps -a --filter "name=^wicked-adventures-" --format "{{.Names}}" | while read old_container; do
+            if [ ! -z "\$old_container" ]; then
+              echo "  Removing: \$old_container"
+              docker rm -f \$old_container 2>/dev/null || true
+            fi
+          done
+          echo "✓ Old containers cleaned up"
+          echo ""
+
+          # Run new container with unique name
+          echo "Running new container..."
+          docker run -d \
+            --name \$CONTAINER_NAME \
+            -p 80:5000 \
+            -e FLASK_ENV=production \
+            -e SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+            -e SEED_ADMIN_PASSWORD="${{ secrets.SEED_ADMIN_PASSWORD }}" \
+            \$IMAGE_NAME:latest
+
+          echo ""
+          echo "✓ Container started successfully"
+          sleep 5
+          echo ""
+
+          echo "DOCKER DEPLOYMENT COMPLETED SUCCESSFULLY"
+          echo "Container: \$CONTAINER_NAME"
+          echo "Application accessible at:"
+          echo "http://${{ secrets.EC2_HOST }}"
+          echo ""
+
+          EOF
+
+  # ============================================================
+  # DOCUMENTATION BUILD JOB
+  # ============================================================
+  build-docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install MkDocs
+        run: pip install mkdocs mkdocs-material pymdown-extensions
+
+      - name: Validate documentation structure
+        run: |
+          echo "Checking documentation files..."
+          test -f mkdocs.yml || (echo "mkdocs.yml not found" && exit 1)
+          test -d docs || (echo "docs directory not found" && exit 1)
+          test -f docs/index.md || (echo "docs/index.md not found" && exit 1)
+          echo "Documentation structure is valid"
+
+      - name: Build documentation
+        run: mkdocs build --strict
+
+      - name: Upload documentation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-site
+          path: site/
+          retention-days: 7

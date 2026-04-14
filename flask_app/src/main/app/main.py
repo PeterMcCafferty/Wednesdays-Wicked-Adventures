@@ -25,26 +25,28 @@ def profile():
 @login_required
 def new_booking():
     parks = Park.query.all()
-    return render_template('new_booking.html', parks=parks)
+    today = datetime.now().strftime('%Y-%m-%d')
+    return render_template('new_booking.html', parks=parks, today=today)
 
-@main.route('/booking', methods=['GET', 'POST'])
+@main.route('/booking', methods=['GET'])
 @login_required
-def booking():
-    if request.method == 'POST':
-        booking = Booking(
-            user_id=current_user.user_id,
-            park_id=request.form['park_id'],
-            date=datetime.fromisoformat(request.form['date']),
-            num_tickets=int(request.form['num_tickets']),
-            health_safety='health_safety' in request.form
-        )
+def booking_form():
+    return redirect(url_for('main.profile')), 302
 
-        db.session.add(booking)
-        db.session.commit()
+@main.route('/booking', methods=['POST'])
+@login_required
+def booking_submit():
+    booking = Booking(
+        user_id=current_user.user_id,
+        park_id=request.form['park_id'],
+        date=datetime.fromisoformat(request.form['date']),
+        num_tickets=int(request.form['num_tickets']),
+        health_safety='health_safety' in request.form
+    )
 
-        return redirect(url_for('main.profile'))
+    db.session.add(booking)
+    db.session.commit()
 
-    parks = Park.query.all()
     return redirect(url_for('main.profile'))
 
 @main.route('/health-safety-guidelines')
@@ -53,20 +55,37 @@ def health_safety_guidelines():
     current_date = datetime.now()
     return render_template('health_safety_guidelines.html', now=current_date)
 
-@main.route('/contact', methods=['GET', 'POST'])
-def contact():
-    parks = Park.query.all()
-    if request.method == 'POST':
+@main.route('/contact', methods=['GET'])
+def contact_page():
+    return redirect(url_for('main.index', _anchor='contact'))
+
+@main.route('/contact', methods=['POST'])
+def contact_submit():
+    referrer = request.referrer or url_for('main.index')
+    
+    if '#contact' in referrer:
+        referrer = referrer.split('#')[0]
+    
+    try:
+        if not all([request.form.get('name'), 
+                    request.form.get('email'), 
+                    request.form.get('message')]):
+            flash('Please fill in all fields.', 'error')
+            return redirect(referrer + '#contact')
+        
         message = Message(
             name=request.form['name'],
             email=request.form['email'],
             message=request.form['message']
         )
-
+        
         db.session.add(message)
         db.session.commit()
-
-        flash('Thank you for your message!')
-        return render_template('index.html', parks=parks)
         
-    return render_template('index.html', parks=parks)
+        flash('Thank you for your message! We will get back to you soon.', 'success')
+        
+    except Exception as e:
+        print(f"Error sending message: {e}")
+        flash('Sorry, there was an error sending your message. Please try again.', 'error')
+    
+    return redirect(referrer + '#contact')
